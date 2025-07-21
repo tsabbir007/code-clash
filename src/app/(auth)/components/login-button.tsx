@@ -14,15 +14,7 @@ const LoginButton = () => {
     const { data: session } = authClient.useSession()
 
 
-    if (!session) {
-        return (
-            <div className="flex items-center gap-2">
-                <Skeleton className="size-8 rounded-full" />
-            </div>
-        )
-    }
-
-    if (session.user) {
+    if (session) {
         return (
             <div className="flex items-center gap-2">
                 <NavUser
