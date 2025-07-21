@@ -60,30 +60,7 @@ export function ContestList() {
                             <ContestListCard key={contest.title} {...contest} />
                         ))}
 
-                        <Pagination>
-                            <PaginationContent>
-                                <PaginationItem>
-                                    <PaginationPrevious href="#" />
-                                </PaginationItem>
-                                <PaginationItem>
-                                    <PaginationLink href="#">1</PaginationLink>
-                                </PaginationItem>
-                                <PaginationItem>
-                                    <PaginationLink href="#" isActive>
-                                        2
-                                    </PaginationLink>
-                                </PaginationItem>
-                                <PaginationItem>
-                                    <PaginationLink href="#">3</PaginationLink>
-                                </PaginationItem>
-                                <PaginationItem>
-                                    <PaginationEllipsis />
-                                </PaginationItem>
-                                <PaginationItem>
-                                    <PaginationNext href="#" />
-                                </PaginationItem>
-                            </PaginationContent>
-                        </Pagination>
+                        <CustomPagination />
                     </div>
 
                 </TabsContent>
@@ -96,5 +73,35 @@ export function ContestList() {
                 </TabsContent>
             </Tabs>
         </div>
+    )
+}
+
+
+export function CustomPagination() {
+    return (
+        <Pagination>
+            <PaginationContent>
+                <PaginationItem>
+                    <PaginationPrevious href="#" />
+                </PaginationItem>
+                <PaginationItem>
+                    <PaginationLink href="#">1</PaginationLink>
+                </PaginationItem>
+                <PaginationItem>
+                    <PaginationLink href="#" isActive>
+                        2
+                    </PaginationLink>
+                </PaginationItem>
+                <PaginationItem>
+                    <PaginationLink href="#">3</PaginationLink>
+                </PaginationItem>
+                <PaginationItem>
+                    <PaginationEllipsis />
+                </PaginationItem>
+                <PaginationItem>
+                    <PaginationNext href="#" />
+                </PaginationItem>
+            </PaginationContent>
+        </Pagination>
     )
 }
