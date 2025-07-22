@@ -6,12 +6,9 @@ interface AuthLayoutProps {
 
 const AuthLayout = ({ children }: AuthLayoutProps) => {
     return (
-        <div className="container">
-            <Navbar />
-            <div className="flex min-h-[90dvh] items-center justify-center">
-                <div className="w-full max-w-md">
-                    {children}
-                </div>
+        <div className="flex min-h-[90dvh] items-center justify-center">
+            <div className="w-full max-w-md">
+                {children}
             </div>
         </div>
     );

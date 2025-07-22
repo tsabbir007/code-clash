@@ -9,3 +9,9 @@ const pool = new Pool({
 const db = drizzle(pool);
 
 export { db };
+
+// npx drizzle-kit generate - generate migrations
+// npx drizzle-kit migrate  - run migrations
+// npx drizzle-kit push     - push changes to the database
+// npx drizzle-kit studio   - open the studio
+// npx drizzle-kit pull     - pull changes from the database

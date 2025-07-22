@@ -1,0 +1,85 @@
+import {
+    LayoutDashboard,
+    Eye,
+    FileText,
+    TestTube,
+    Timer,
+    Users,
+    CheckSquare,
+    Code,
+    Upload
+} from "lucide-react";
+import AdminLayout from "../../components/layout/admin-layout";
+
+
+interface ContestsLayoutProps {
+    children: React.ReactNode;
+    params: {
+        problem_id: string;
+    };
+}
+
+const ContestsLayout = ({children, params}: ContestsLayoutProps) => {
+    const { problem_id: problemId } = params;
+
+    const dashboardItems = [
+        {
+            icon: <LayoutDashboard className="w-4 h-4" />,
+            name: "Overview",
+            href: "/overview",
+        },
+        {
+            icon: <Eye className="w-4 h-4" />,
+            name: "Preview Problems",
+            href: "/preview-problems",
+        },
+        {
+            icon: <FileText className="w-4 h-4" />,
+            name: "Statements",
+            href: "/statements",
+        },
+        {
+            icon: <TestTube className="w-4 h-4" />,
+            name: "Test Cases",
+            href: "/test-cases",
+        },
+        {
+            icon: <Timer className="w-4 h-4" />,
+            name: "Limits",
+            href: "/limits",
+        },
+        {
+            icon: <Users className="w-4 h-4" />,
+            name: "Moderators",
+            href: "/moderators",
+        },
+        {
+            icon: <CheckSquare className="w-4 h-4" />,
+            name: "Checkers & Validators",
+            href: "/checkers",
+        },
+        {
+            icon: <Code className="w-4 h-4" />,
+            name: "Solutions",
+            href: "/solutions",
+        },
+        {
+            icon: <Upload className="w-4 h-4" />,
+            name: "Submissions",
+            href: "/submissions",
+        }
+    ];
+
+    const updatedDashboardItems = dashboardItems.map((item) => ({
+        ...item,
+        href: `/admin/problems/${problemId}${item.href}`
+    }));
+
+    return (
+        <AdminLayout dashboardItems={updatedDashboardItems}>
+            {children}
+        </AdminLayout>
+    )
+}
+
+export default ContestsLayout;

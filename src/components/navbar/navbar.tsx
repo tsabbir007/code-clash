@@ -52,9 +52,9 @@ const components: { title: string; href: string; description: string }[] = [
 
 
 export function Navbar() {
-  
+
   return (
-    <div className="flex justify-between items-center p-4 z-50">
+    <div className="flex justify-between items-center p-4 z-50 sticky top-0 bg-[var(--black)] pb-6">
       <NavigationMenu viewport={false}>
         <NavigationMenuList>
           {/* <NavigationMenuItem>
@@ -199,9 +199,9 @@ export function Navbar() {
           </NavigationMenuItem> */}
         </NavigationMenuList>
       </NavigationMenu>
-      
 
-      <LoginButton/>
+
+      <LoginButton />
       {/* <NavUser/> */}
     </div>
   )
