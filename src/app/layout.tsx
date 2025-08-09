@@ -31,7 +31,7 @@ export default function RootLayout({
       >
         <Providers>
           <div className="flex flex-col max-w-7xl mx-auto">
-            <Navbar />
+            {/* <Navbar /> */}
             {children}
           </div>
         </Providers>
