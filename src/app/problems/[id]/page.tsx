@@ -85,13 +85,10 @@ export default function ProblemPage() {
     const [code, setCode] = useState("")
     const [language, setLanguage] = useState("cpp")
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [isExecuting, setIsExecuting] = useState(false)
     const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null)
-    const [activeTab, setActiveTab] = useState("problem")
-    const [currentTestIndex, setCurrentTestIndex] = useState(0)
-    const [isRunningTests, setIsRunningTests] = useState(false)
     const [submissions, setSubmissions] = useState<SubmissionResult[]>([]);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [expandedTestCases, setExpandedTestCases] = useState<Set<string>>(new Set());
 
     const languages = [
         { value: "python", label: "Python 3" },
@@ -133,298 +130,9 @@ export default function ProblemPage() {
         }
     }
 
-    const runTestCases = async (testCases: TestCaseResult[]) => {
-        console.log(`runTestCases called with ${testCases.length} test cases:`, testCases);
 
-        if (testCases.length === 0) {
-            console.warn('No test cases provided to runTestCases');
-            setIsRunningTests(false);
-            return;
-        }
 
-        setIsRunningTests(true)
-        setCurrentTestIndex(0)
 
-        // Create a local copy of test cases to work with
-        let localTestCases = [...testCases]
-
-        // Add a timeout to prevent infinite running state
-        const timeoutId = setTimeout(() => {
-            console.warn('Test case execution timed out, forcing completion');
-            setIsRunningTests(false);
-            setCurrentTestIndex(0);
-
-            // Force completion with failed status if still running
-            if (submissionResult) {
-                const finalVerdict = 'Time Limit Exceeded';
-                setSubmissionResult(prev => prev ? {
-                    ...prev,
-                    verdict: finalVerdict,
-                    testCaseResults: localTestCases.map(tc =>
-                        tc.status === 'running' ? { ...tc, status: 'failed', error: 'Time limit exceeded' } : tc
-                    )
-                } : null);
-
-                setSubmissions(prev => prev.map(sub =>
-                    sub.id === submissionResult.id ? {
-                        ...sub,
-                        verdict: finalVerdict,
-                        testCaseResults: localTestCases.map(tc =>
-                            tc.status === 'running' ? { ...tc, status: 'failed', error: 'Time limit exceeded' } : tc
-                        )
-                    } : sub
-                ));
-            }
-        }, 30000); // 30 second timeout
-
-        try {
-            // Get the current code to evaluate against test cases
-            const currentCode = code.trim();
-
-            for (let i = 0; i < localTestCases.length; i++) {
-                console.log(`Processing test case ${i + 1}/${localTestCases.length}:`, localTestCases[i]);
-
-                // Update current test case to running
-                setCurrentTestIndex(i)
-
-                // Update local test cases
-                localTestCases[i] = { ...localTestCases[i], status: 'running' }
-
-                // Update submission result state
-                setSubmissionResult(prev => prev ? {
-                    ...prev,
-                    testCaseResults: localTestCases
-                } : null)
-
-                // Simulate test case execution
-                await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400))
-
-                // Actually evaluate the code against the test case
-                const testCase = localTestCases[i];
-                const { isPassed, actualOutput, error } = evaluateCodeAgainstTestCase(currentCode, testCase);
-
-                const executionTime = Math.floor(Math.random() * 50) + 10
-                const memoryUsage = Math.floor(Math.random() * 100) + 50
-
-                // Update local test cases
-                localTestCases[i] = {
-                    ...localTestCases[i],
-                    status: isPassed ? 'passed' : 'failed',
-                    executionTime,
-                    memoryUsage,
-                    actualOutput,
-                    error
-                }
-
-                console.log(`Test case ${i + 1} result:`, localTestCases[i]);
-
-                // Update submission result state
-                setSubmissionResult(prev => prev ? {
-                    ...prev,
-                    testCaseResults: localTestCases
-                } : null)
-
-                // Small delay between test cases
-                await new Promise(resolve => setTimeout(resolve, 200))
-            }
-
-            console.log('All test cases processed. Final results:', localTestCases);
-
-            // Calculate final results using local test cases
-            const finalResults = localTestCases.map(tc => tc.status === 'passed')
-            const passedCount = finalResults.filter(Boolean).length
-            const finalVerdict = passedCount === localTestCases.length ? 'Accepted' : 'Wrong Answer'
-
-            // Calculate score based on actual test case points from the database
-            const totalPoints = localTestCases.reduce((sum, tc) => {
-                // Find the corresponding test case in the problem's allTestCases to get the actual points
-                const problemTestCase = problem?.allTestCases?.find(ptc => ptc.id === tc.id);
-                return sum + (problemTestCase?.points || 1); // Default to 1 point if not found
-            }, 0);
-
-            const earnedPoints = localTestCases.reduce((sum, tc) => {
-                if (tc.status === 'passed') {
-                    const problemTestCase = problem?.allTestCases?.find(ptc => ptc.id === tc.id);
-                    return sum + (problemTestCase?.points || 1);
-                }
-                return sum;
-            }, 0);
-
-            const finalScore = totalPoints > 0 ? Math.floor((earnedPoints / totalPoints) * 100) : 0
-            const totalScore = totalPoints
-
-            const totalExecutionTime = localTestCases.reduce((sum, tc) => sum + (tc.executionTime || 0), 0)
-            const maxMemoryUsage = Math.max(...localTestCases.map(tc => tc.memoryUsage || 0))
-
-            console.log(`Scoring: ${earnedPoints}/${totalPoints} points = ${finalScore}%`);
-
-            // Update the submission result with final values
-            setSubmissionResult(prev => prev ? {
-                ...prev,
-                testCaseResults: localTestCases,
-                verdict: finalVerdict,
-                testCasesPassed: passedCount,
-                score: finalScore,
-                totalScore,
-                cpuTime: totalExecutionTime,
-                memoryUsage: maxMemoryUsage,
-                executionTime: totalExecutionTime,
-                memoryUsed: maxMemoryUsage
-            } : null)
-
-            // Update the submission result state to ensure consistency
-            setSubmissionResult(prev => prev ? {
-                ...prev,
-                testCaseResults: localTestCases,
-                verdict: finalVerdict,
-                testCasesPassed: passedCount,
-                score: finalScore,
-                totalScore,
-                cpuTime: totalExecutionTime,
-                memoryUsage: maxMemoryUsage,
-                executionTime: totalExecutionTime,
-                memoryUsed: maxMemoryUsage
-            } : null)
-
-            // Return the final result for the caller to use
-            return {
-                verdict: finalVerdict,
-                score: finalScore,
-                totalScore,
-                testCasesPassed: passedCount,
-                totalTestCases: localTestCases.length,
-                executionTime: totalExecutionTime,
-                memoryUsed: maxMemoryUsage,
-                testCaseResults: localTestCases
-            };
-
-            setIsRunningTests(false)
-            setCurrentTestIndex(0)
-        } finally {
-            // Clear timeout and ensure cleanup
-            clearTimeout(timeoutId);
-        }
-    }
-
-    // Function to evaluate code against a test case
-    const evaluateCodeAgainstTestCase = (code: string, testCase: TestCaseResult) => {
-        try {
-            // For now, implement a simple evaluation logic
-            // This is a basic implementation that can be enhanced for more complex problems
-
-            // Check if the code contains basic syntax or logic that would likely fail
-            const hasBasicErrors = checkForBasicCodeErrors(code);
-
-            if (hasBasicErrors) {
-                return {
-                    isPassed: false,
-                    actualOutput: 'Compilation Error',
-                    error: 'Code contains basic syntax or logic errors'
-                };
-            }
-
-            // For this simulation, we'll use a simple heuristic based on code quality
-            // In a real system, this would execute the code against the test case
-            const codeQuality = analyzeCodeQuality(code, testCase);
-
-            if (codeQuality.score < 0.3) {
-                return {
-                    isPassed: false,
-                    actualOutput: 'Wrong Answer',
-                    error: `Expected ${testCase.expectedOutput}, got incorrect output`
-                };
-            } else if (codeQuality.score < 0.7) {
-                // Some test cases might pass, some might fail
-                const randomPass = Math.random() < 0.3; // 30% chance of passing
-                return {
-                    isPassed: randomPass,
-                    actualOutput: randomPass ? testCase.expectedOutput : 'Wrong Answer',
-                    error: randomPass ? undefined : `Expected ${testCase.expectedOutput}, got incorrect output`
-                };
-            } else {
-                // High quality code is more likely to pass
-                const randomPass = Math.random() < 0.9; // 90% chance of passing
-                return {
-                    isPassed: randomPass,
-                    actualOutput: randomPass ? testCase.expectedOutput : 'Wrong Answer',
-                    error: randomPass ? undefined : `Expected ${testCase.expectedOutput}, got incorrect output`
-                };
-            }
-        } catch (error) {
-            return {
-                isPassed: false,
-                actualOutput: 'Runtime Error',
-                error: `Runtime error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            };
-        }
-    };
-
-    // Helper function to check for basic code errors
-    const checkForBasicCodeErrors = (code: string): boolean => {
-        const trimmedCode = code.trim();
-
-        // Check for empty code
-        if (!trimmedCode) return true;
-
-        // Check for basic syntax issues (very basic checks)
-        const hasUnclosedBrackets = (trimmedCode.match(/[{}()[\]]/g) || []).length % 2 !== 0;
-        const hasUnclosedQuotes = (trimmedCode.match(/["']/g) || []).length % 2 !== 0;
-        const hasMissingSemicolon = trimmedCode.includes(';') && !trimmedCode.includes('console.log') && !trimmedCode.includes('return');
-
-        return hasUnclosedBrackets || hasUnclosedQuotes || hasMissingSemicolon;
-    };
-
-    // Helper function to analyze code quality
-    const analyzeCodeQuality = (code: string, testCase: TestCaseResult): { score: number; issues: string[] } => {
-        let score = 0.5; // Start with neutral score
-        const issues: string[] = [];
-
-        const trimmedCode = code.trim();
-
-        // Check code length (too short might be incomplete)
-        if (trimmedCode.length < 10) {
-            score -= 0.2;
-            issues.push('Code too short, likely incomplete');
-        }
-
-        // Check for common programming patterns
-        if (trimmedCode.includes('function') || trimmedCode.includes('=>')) {
-            score += 0.1;
-        }
-
-        if (trimmedCode.includes('if') || trimmedCode.includes('for') || trimmedCode.includes('while')) {
-            score += 0.1;
-        }
-
-        if (trimmedCode.includes('return')) {
-            score += 0.1;
-        }
-
-        // Check for input/output handling
-        if (trimmedCode.includes('input') || trimmedCode.includes('console.log')) {
-            score += 0.1;
-        }
-
-        // Check for mathematical operations (common in programming problems)
-        if (trimmedCode.includes('+') || trimmedCode.includes('-') || trimmedCode.includes('*') || trimmedCode.includes('/')) {
-            score += 0.1;
-        }
-
-        // Check for variable declarations
-        if (trimmedCode.includes('let') || trimmedCode.includes('const') || trimmedCode.includes('var')) {
-            score += 0.1;
-        }
-
-        // Penalize obvious errors
-        if (trimmedCode.includes('undefined') || trimmedCode.includes('null')) {
-            score -= 0.1;
-        }
-
-        // Ensure score is between 0 and 1
-        score = Math.max(0, Math.min(1, score));
-
-        return { score, issues };
-    };
 
     const loadSubmissions = async () => {
         try {
@@ -513,6 +221,27 @@ export default function ProblemPage() {
             const data = await response.json();
 
             if (data.success) {
+                // Create a solution record for execution
+                const solutionResponse = await fetch(`/api/problems/${problemId}/solutions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        label: `User Solution ${new Date().toLocaleTimeString()}`,
+                        note: 'User submitted solution',
+                        language,
+                        sourceCode: code
+                    })
+                });
+
+                if (!solutionResponse.ok) {
+                    throw new Error('Failed to create solution for execution');
+                }
+
+                const solutionData = await solutionResponse.json();
+                const solutionId = solutionData.solution.id;
+
                 // Create test case results from the problem's all test cases
                 const testCaseResults: TestCaseResult[] = (problem?.allTestCases || []).map(tc => ({
                     id: tc.id,
@@ -552,61 +281,125 @@ export default function ProblemPage() {
                 setSubmissionResult(newSubmission);
                 setSubmissions(prev => [newSubmission, ...prev]);
 
-                // Simulate test case execution (in a real system, this would be handled by a background job)
-                const finalResult = await runTestCases(testCaseResults);
+                try {
+                    setIsExecuting(true);
 
-                if (!finalResult) {
-                    console.error('runTestCases returned undefined result');
-                    return;
+                    // Debug: Log the URL being constructed
+                    const executionUrl = `/api/problems/${problemId}/solutions/${solutionId}/execute`;
+                    console.log('Debug - Execution URL:', executionUrl);
+                    console.log('Debug - problemId:', problemId);
+                    console.log('Debug - solutionId:', solutionId);
+
+                    const executionResponse = await fetch(executionUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+
+                    if (!executionResponse.ok) {
+                        throw new Error(`Execution failed: ${executionResponse.statusText}`);
+                    }
+
+                    const executionData = await executionResponse.json();
+
+                    if (executionData.success) {
+                        // Transform the execution results to match our interface
+                        const transformedTestCases: TestCaseResult[] = executionData.results.testCaseResults.map((tc: any) => ({
+                            id: tc.testCaseId,
+                            label: tc.testCaseLabel,
+                            status: tc.verdict === 'AC' ? 'passed' : 'failed',
+                            input: '', // We don't need to show input in results
+                            expectedOutput: '', // We don't need to show expected output in results
+                            actualOutput: tc.verdict === 'AC' ? 'Correct' : 'Incorrect',
+                            executionTime: tc.cpuTime,
+                            memoryUsage: tc.memoryUsage,
+                            error: tc.error
+                        }));
+
+                        // Calculate score based on passed test cases
+                        const passedCount = executionData.results.passedTests;
+                        const totalCount = executionData.results.totalTests;
+                        const score = totalCount > 0 ? Math.floor((passedCount / totalCount) * 100) : 0;
+
+                        // Update submission result with real execution data
+                        const finalSubmission = {
+                            ...newSubmission,
+                            verdict: executionData.results.overallVerdict === 'AC' ? 'Accepted' : 'Wrong Answer',
+                            score: score,
+                            cpuTime: executionData.results.maxTime,
+                            memoryUsage: executionData.results.maxMemory,
+                            testCasesPassed: passedCount,
+                            totalTestCases: totalCount,
+                            executionTime: executionData.results.maxTime,
+                            memoryUsed: executionData.results.maxMemory,
+                            testCaseResults: transformedTestCases
+                        };
+
+                        setSubmissionResult(finalSubmission);
+
+                        // Update the submission in the local submissions array
+                        setSubmissions(prev => prev.map(sub =>
+                            sub.id === newSubmission.id ? finalSubmission : sub
+                        ));
+
+                        // Update the submission in the API with the final results
+                        const updateResponse = await fetch(`/api/submissions/${data.submission.id}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                verdict: finalSubmission.verdict,
+                                score: finalSubmission.score,
+                                cpuTime: finalSubmission.cpuTime,
+                                memoryUsage: finalSubmission.memoryUsage,
+                                testCasesPassed: finalSubmission.testCasesPassed,
+                                totalTestCases: finalSubmission.totalTestCases
+                            })
+                        });
+
+                        if (!updateResponse.ok) {
+                            console.error('Failed to update submission:', await updateResponse.text());
+                        }
+
+                        console.log('Execution completed successfully:', executionData);
+                    } else {
+                        throw new Error(executionData.error || 'Execution failed');
+                    }
+                } catch (executionError) {
+                    console.error('Execution error:', executionError);
+
+                    // Mark submission as failed due to execution error
+                    const failedSubmission = {
+                        ...newSubmission,
+                        verdict: 'System Error',
+                        error: `Execution failed: ${executionError instanceof Error ? executionError.message : 'Unknown error'}`
+                    };
+
+                    setSubmissionResult(failedSubmission);
+                    setSubmissions(prev => prev.map(sub =>
+                        sub.id === newSubmission.id ? failedSubmission : sub
+                    ));
+
+                    // Update the submission in the API
+                    const updateResponse = await fetch(`/api/submissions/${data.submission.id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            verdict: 'System Error',
+                            error: `Execution failed: ${executionError instanceof Error ? executionError.message : 'Unknown error'}`
+                        })
+                    });
+
+                    if (!updateResponse.ok) {
+                        console.error('Failed to update submission:', await updateResponse.text());
+                    }
+                } finally {
+                    setIsExecuting(false);
                 }
-
-                // Now update the submission in the API with the final results
-                const finalSubmission = {
-                    ...newSubmission,
-                    verdict: finalResult.verdict,
-                    score: finalResult.score,
-                    cpuTime: finalResult.executionTime,
-                    memoryUsage: finalResult.memoryUsed,
-                    testCasesPassed: finalResult.testCasesPassed,
-                    totalTestCases: finalResult.totalTestCases
-                };
-
-                // Update the submission in the local submissions array to ensure consistency
-                setSubmissions(prev => prev.map(sub =>
-                    sub.id === newSubmission.id ? {
-                        ...sub,
-                        verdict: finalResult.verdict,
-                        score: finalResult.score,
-                        testCasesPassed: finalResult.testCasesPassed,
-                        totalTestCases: finalResult.totalTestCases,
-                        cpuTime: finalResult.executionTime,
-                        memoryUsage: finalResult.memoryUsed,
-                        executionTime: finalResult.executionTime,
-                        memoryUsed: finalResult.memoryUsed,
-                        testCaseResults: finalResult.testCaseResults
-                    } : sub
-                ));
-
-                const updateResponse = await fetch(`/api/submissions/${data.submission.id}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        verdict: finalSubmission.verdict,
-                        score: finalSubmission.score,
-                        cpuTime: finalSubmission.cpuTime,
-                        memoryUsage: finalSubmission.memoryUsage,
-                        testCasesPassed: finalSubmission.testCasesPassed,
-                        totalTestCases: finalSubmission.totalTestCases
-                    })
-                });
-
-                if (!updateResponse.ok) {
-                    console.error('Failed to update submission:', await updateResponse.text());
-                }
-
-                // No need to reload submissions since we updated the local state directly
             } else {
                 alert(`Submission failed: ${data.error}`);
             }
@@ -625,16 +418,22 @@ export default function ProblemPage() {
     const getVerdictIcon = (verdict: string) => {
         switch (verdict) {
             case "Accepted":
+            case "AC":
                 return <CheckCircle className="h-5 w-5 text-green-500" />
             case "Wrong Answer":
+            case "WA":
                 return <XCircle className="h-5 w-5 text-red-500" />
             case "Time Limit Exceeded":
+            case "TLE":
                 return <Clock className="h-5 w-5 text-yellow-500" />
             case "Memory Limit Exceeded":
+            case "MLE":
                 return <AlertTriangle className="h-5 w-5 text-orange-500" />
             case "Runtime Error":
+            case "RE":
                 return <AlertTriangle className="h-5 w-5 text-red-600" />
             case "Compilation Error":
+            case "CE":
                 return <FileX className="h-5 w-5 text-red-600" />
             case "System Error":
                 return <AlertTriangle className="h-5 w-5 text-red-600" />
@@ -650,16 +449,22 @@ export default function ProblemPage() {
     const getVerdictColor = (verdict: string) => {
         switch (verdict) {
             case "Accepted":
+            case "AC":
                 return "text-green-500"
             case "Wrong Answer":
+            case "WA":
                 return "text-red-500"
             case "Time Limit Exceeded":
+            case "TLE":
                 return "text-yellow-500"
             case "Memory Limit Exceeded":
+            case "MLE":
                 return "text-orange-500"
             case "Runtime Error":
+            case "RE":
                 return "text-red-600"
             case "Compilation Error":
+            case "CE":
                 return "text-red-600"
             case "System Error":
                 return "text-red-600"
@@ -722,21 +527,47 @@ export default function ProblemPage() {
         return langObj ? langObj.label : lang;
     };
 
-    const toggleTestCaseExpansion = (submissionId: string) => {
-        setExpandedTestCases(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(submissionId)) {
-                newSet.delete(submissionId);
-            } else {
-                newSet.add(submissionId);
-            }
-            return newSet;
-        });
+    // Helper function to get code templates for different languages
+    const getCodeTemplate = (lang: string): string => {
+        switch (lang) {
+            case 'python':
+                return `# Python solution
+def solve():
+    # Your code here
+    pass
+
+if __name__ == "__main__":
+    solve()`;
+            case 'cpp':
+                return `#include <iostream>
+using namespace std;
+
+int main() {
+    // Your code here
+    
+    return 0;
+}`;
+            case 'java':
+                return `public class Solution {
+    public static void main(String[] args) {
+        // Your code here
+        
+    }
+}`;
+            case 'javascript':
+                return `// JavaScript solution
+function solve() {
+    // Your code here
+}
+
+solve();`;
+            default:
+                return `// ${lang} solution
+// Your code here`;
+        }
     };
 
-    const isTestCaseExpanded = (submissionId: string) => {
-        return expandedTestCases.has(submissionId);
-    };
+
 
     useEffect(() => {
         if (problemId) {
