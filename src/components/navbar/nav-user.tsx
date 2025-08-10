@@ -1,5 +1,3 @@
-"use client"
-
 import {
     BadgeCheck,
     Bell,
@@ -23,6 +21,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { Button } from "../ui/button";
+import { auth } from "@/lib/auth";
+import { authClient } from "@/lib/auth-client";
 
 interface NavUserProps {
     name: string;
@@ -49,9 +49,9 @@ export function NavUser({ name, email, avatar, onLogout }: NavUserProps) {
             href: "/account"
         },
         {
-            label: "Notifications",
+            label: "Admin Panel",
             icon: <Bell />,
-            href: "/notifications"
+            href: "/admin"
         },
         {
             label: "Logout",

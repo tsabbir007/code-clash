@@ -17,7 +17,7 @@ const LANGUAGE_IDS: Record<string, number> = {
     rust: 73, // Rust (1.40.0)
 };
 
-const JUDGE0_API_ENDPOINT = process.env.JUDGE0_API_ENDPOINT || 'http://localhost:2358';
+const JUDGE0_API_ENDPOINT = process.env.NEXT_PUBLIC_JUDGE0_API_ENDPOINT || 'http://localhost:2358';
 
 interface Judge0Submission {
     id: string;

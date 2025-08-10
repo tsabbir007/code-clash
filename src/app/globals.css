@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import '../styles/_variables.scss';
-@import '../styles/_keyframe-animations.scss';
+@import "../styles/_variables.scss";
+@import "../styles/_keyframe-animations.scss";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -118,7 +118,32 @@
   * {
     @apply border-border outline-ring/50;
   }
- 
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Ensure all form elements use dark theme */
+  input,
+  textarea,
+  select {
+    @apply bg-background border-border text-foreground;
+  }
+
+  /* Ensure cards and containers use dark theme */
+  .card,
+  .bg-white,
+  .bg-gray-50,
+  .bg-gray-100 {
+    @apply bg-card;
+  }
+
+  /* Remove any white backgrounds from components */
+  [class*="bg-white"],
+  [class*="bg-gray-50"],
+  [class*="bg-gray-100"] {
+    @apply bg-card;
+  }
 }
 
 @utility container {

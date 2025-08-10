@@ -1,430 +1,422 @@
 "use client"
 
-import {
-    ResizableHandle,
-    ResizablePanel,
-    ResizablePanelGroup,
-} from "@/components/ui/resizable"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Play, CheckCircle, XCircle, Clock } from "lucide-react"
-import Editor from "@monaco-editor/react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
+
 import { Navbar } from "@/components/navbar/navbar"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+    Carousel,
+    CarouselContent,
+    CarouselItem,
+    CarouselNext,
+    CarouselPrevious,
+} from "@/components/ui/carousel"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
+import { Loader2, Search } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
 
-const languages = [
-    { value: "typescript", label: "TypeScript" },
-    { value: "javascript", label: "JavaScript" },
-    { value: "python", label: "Python" },
-    { value: "java", label: "Java" },
-    { value: "cpp", label: "C++" },
-    { value: "csharp", label: "C#" },
-    { value: "go", label: "Go" },
-    { value: "rust", label: "Rust" },
-    { value: "php", label: "PHP" },
-    { value: "ruby", label: "Ruby" },
-    { value: "swift", label: "Swift" },
-    { value: "kotlin", label: "Kotlin" },
-]
-
-const defaultCodeSnippets = {
-    typescript: `function twoSum(nums: number[], target: number): number[] {
-    // Your code here
-    return [];
-}
-
-// Test cases
-console.log(twoSum([2, 7, 11, 15], 9)); // Expected: [0, 1]
-console.log(twoSum([3, 2, 4], 6)); // Expected: [1, 2]
-console.log(twoSum([3, 3], 6)); // Expected: [0, 1]`,
-
-    javascript: `function twoSum(nums, target) {
-    // Your code here
-    return [];
-}
-
-// Test cases
-console.log(twoSum([2, 7, 11, 15], 9)); // Expected: [0, 1]
-console.log(twoSum([3, 2, 4], 6)); // Expected: [1, 2]
-console.log(twoSum([3, 3], 6)); // Expected: [0, 1]`,
-
-    python: `def two_sum(nums, target):
-    # Your code here
-    return []
-
-# Test cases
-print(two_sum([2, 7, 11, 15], 9))  # Expected: [0, 1]
-print(two_sum([3, 2, 4], 6))       # Expected: [1, 2]
-print(two_sum([3, 3], 6))          # Expected: [0, 1]`,
-
-    java: `public class Solution {
-    public int[] twoSum(int[] nums, int target) {
-        // Your code here
-        return new int[]{};
-    }
-    
-    public static void main(String[] args) {
-        Solution solution = new Solution();
-        // Test cases
-        System.out.println(Arrays.toString(solution.twoSum(new int[]{2, 7, 11, 15}, 9))); // Expected: [0, 1]
-        System.out.println(Arrays.toString(solution.twoSum(new int[]{3, 2, 4}, 6)));       // Expected: [1, 2]
-        System.out.println(Arrays.toString(solution.twoSum(new int[]{3, 3}, 6)));          // Expected: [0, 1]
-    }
-}`,
-
-    cpp: `#include <vector>
-#include <iostream>
-using namespace std;
-
-class Solution {
-public:
-    vector<int> twoSum(vector<int>& nums, int target) {
-        // Your code here
-        return {};
-    }
+// Utility function for case-insensitive difficulty comparison
+const normalizeDifficulty = (difficulty: string): string => {
+    if (!difficulty) return '';
+    return difficulty.toLowerCase();
 };
 
-int main() {
-    Solution solution;
-    // Test cases
-    vector<int> result1 = solution.twoSum({2, 7, 11, 15}, 9);
-    vector<int> result2 = solution.twoSum({3, 2, 4}, 6);
-    vector<int> result3 = solution.twoSum({3, 3}, 6);
-    return 0;
-}`,
+const isDifficultyMatch = (problemDifficulty: string, filterDifficulty: string): boolean => {
+    return normalizeDifficulty(problemDifficulty) === normalizeDifficulty(filterDifficulty);
+};
 
-    csharp: `using System;
-using System.Collections.Generic;
-
-public class Solution {
-    public int[] TwoSum(int[] nums, int target) {
-        // Your code here
-        return new int[]{};
-    }
-    
-    public static void Main() {
-        var solution = new Solution();
-        // Test cases
-        Console.WriteLine(string.Join(",", solution.TwoSum(new int[]{2, 7, 11, 15}, 9))); // Expected: 0,1
-        Console.WriteLine(string.Join(",", solution.TwoSum(new int[]{3, 2, 4}, 6)));       // Expected: 1,2
-        Console.WriteLine(string.Join(",", solution.TwoSum(new int[]{3, 3}, 6)));          // Expected: 0,1
-    }
-}`,
-
-    go: `package main
-
-import "fmt"
-
-func twoSum(nums []int, target int) []int {
-    // Your code here
-    return []int{}
+interface carouselItem {
+    image: string;
+    url: string;
 }
 
-func main() {
-    // Test cases
-    fmt.Println(twoSum([]int{2, 7, 11, 15}, 9)) // Expected: [0 1]
-    fmt.Println(twoSum([]int{3, 2, 4}, 6))       // Expected: [1 2]
-    fmt.Println(twoSum([]int{3, 3}, 6))          // Expected: [0 1]
-}`,
-
-    rust: `fn two_sum(nums: Vec<i32>, target: i32) -> Vec<i32> {
-    // Your code here
-    vec![]
+enum Difficulty {
+    EASY = "Easy",
+    MEDIUM = "Medium",
+    HARD = "Hard",
 }
 
-fn main() {
-    // Test cases
-    println!("{:?}", two_sum(vec![2, 7, 11, 15], 9)); // Expected: [0, 1]
-    println!("{:?}", two_sum(vec![3, 2, 4], 6));       // Expected: [1, 2]
-    println!("{:?}", two_sum(vec![3, 3], 6));          // Expected: [0, 1]
-}`,
-
-    php: `<?php
-
-function twoSum($nums, $target) {
-    // Your code here
-    return [];
+interface Problem {
+    id: number;
+    title: string;
+    difficulty: string;
+    description: string;
+    timeLimit: number;
+    memoryLimit: number;
+    categories: Array<{
+        id: number;
+        name: string;
+        color: string;
+    }>;
+    userName: string;
 }
 
-// Test cases
-print_r(twoSum([2, 7, 11, 15], 9)); // Expected: [0, 1]
-print_r(twoSum([3, 2, 4], 6));       // Expected: [1, 2]
-print_r(twoSum([3, 3], 6));          // Expected: [0, 1]
-?>`,
-
-    ruby: `def two_sum(nums, target)
-    # Your code here
-    []
-end
-
-# Test cases
-puts two_sum([2, 7, 11, 15], 9).inspect # Expected: [0, 1]
-puts two_sum([3, 2, 4], 6).inspect       # Expected: [1, 2]
-puts two_sum([3, 3], 6).inspect          # Expected: [0, 1]`,
-
-    swift: `func twoSum(_ nums: [Int], _ target: Int) -> [Int] {
-    // Your code here
-    return []
+interface Category {
+    id: number;
+    name: string;
+    color: string;
 }
 
-// Test cases
-print(twoSum([2, 7, 11, 15], 9)) // Expected: [0, 1]
-print(twoSum([3, 2, 4], 6))       // Expected: [1, 2]
-print(twoSum([3, 3], 6))          // Expected: [0, 1]`,
+export default function ProblemSet() {
+    const [problems, setProblems] = useState<Problem[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [difficulties] = useState<string[]>(["All", "Easy", "Medium", "Hard"]);
+    const [selectedCategory, setSelectedCategory] = useState<string>("All");
+    const [selectedDifficulty, setSelectedDifficulty] = useState<string>("All");
+    const [searchQuery, setSearchQuery] = useState<string>("");
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(0);
+    const [isLoading, setIsLoading] = useState(true);
 
-    kotlin: `fun twoSum(nums: IntArray, target: Int): IntArray {
-    // Your code here
-    return intArrayOf()
-}
+    const carouselItems: carouselItem[] = [
+        {
+            image: "/problemset/problem-card-1.jpeg",
+            url: "/problemset"
+        },
+        {
+            image: "/problemset/problem-card-2.png",
+            url: "/problemset"
+        },
+        {
+            image: "/problemset/problem-card-3.png",
+            url: "/problemset"
+        },
+        {
+            image: "/problemset/problem-card-4.png",
+            url: "/problemset"
+        },
+    ]
 
-fun main() {
-    // Test cases
-    println(twoSum(intArrayOf(2, 7, 11, 15), 9).contentToString()) // Expected: [0, 1]
-    println(twoSum(intArrayOf(3, 2, 4), 6).contentToString())       // Expected: [1, 2]
-    println(twoSum(intArrayOf(3, 3), 6).contentToString())          // Expected: [0, 1]
-}`
-}
+    const loadProblems = async () => {
+        try {
+            setIsLoading(true);
+            const params = new URLSearchParams({
+                page: currentPage.toString(),
+                perPage: '10',
+                ...(selectedCategory !== 'All' && { category: selectedCategory }),
+                ...(selectedDifficulty !== 'All' && { difficulty: selectedDifficulty }),
+                ...(debouncedSearchQuery && { search: debouncedSearchQuery })
+            });
 
-export default function ProblemPage() {
-    const [problemStatement, setProblemStatement] = useState(`# Two Sum
+            const response = await fetch(`/api/problems/public?${params}`);
+            const data = await response.json();
 
-Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.
-
-You may assume that each input would have exactly one solution, and you may not use the same element twice.
-
-You can return the answer in any order.
-
-## Example 1:
-Input: nums = [2,7,11,15], target = 9
-Output: [0,1]
-Explanation: Because nums[0] + nums[1] == 9, we return [0, 1].
-
-## Example 2:
-Input: nums = [3,2,4], target = 6
-Output: [1,2]
-
-## Example 3:
-Input: nums = [3,3], target = 6
-Output: [0,1]
-
-## Constraints:
-- 2 <= nums.length <= 104
-- -109 <= nums[i] <= 109
-- -109 <= target <= 109
-- Only one valid answer exists.
-
-## Follow-up:
-Can you come up with an algorithm that is less than O(n2) time complexity?`)
-
-    const [selectedLanguage, setSelectedLanguage] = useState("typescript")
-    const [code, setCode] = useState(defaultCodeSnippets.typescript)
-    const [isSubmitting, setIsSubmitting] = useState(false)
-    const [submissionResult, setSubmissionResult] = useState<{
-        status: 'idle' | 'success' | 'error' | 'running'
-        message?: string
-    }>({ status: 'idle' })
-
-    const handleLanguageChange = (newLanguage: string) => {
-        setSelectedLanguage(newLanguage)
-        setCode(defaultCodeSnippets[newLanguage as keyof typeof defaultCodeSnippets] || "")
-    }
-
-    const handleSubmit = async () => {
-        setIsSubmitting(true)
-        setSubmissionResult({ status: 'running', message: 'Running your solution...' })
-
-        // Simulate submission process
-        setTimeout(() => {
-            const isSuccess = Math.random() > 0.3 // 70% success rate for demo
-            if (isSuccess) {
-                setSubmissionResult({
-                    status: 'success',
-                    message: 'All test cases passed! 🎉'
-                })
+            if (data.success) {
+                setProblems(data.problems);
+                setCategories(data.categories);
+                setTotalPages(data.pagination.totalPages);
             } else {
-                setSubmissionResult({
-                    status: 'error',
-                    message: 'Some test cases failed. Try again!'
-                })
+                console.error('Failed to load problems:', data.error);
             }
-            setIsSubmitting(false)
-        }, 2000)
-    }
-
-    const getStatusIcon = () => {
-        switch (submissionResult.status) {
-            case 'success':
-                return <CheckCircle className="h-4 w-4 text-green-500" />
-            case 'error':
-                return <XCircle className="h-4 w-4 text-red-500" />
-            case 'running':
-                return <Clock className="h-4 w-4 text-yellow-500 animate-spin" />
-            default:
-                return null
+        } catch (error) {
+            console.error('Error loading problems:', error);
+        } finally {
+            setIsLoading(false);
         }
-    }
+    };
+
+    // Debounce search query
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery);
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    useEffect(() => {
+        loadProblems();
+    }, [currentPage, selectedCategory, selectedDifficulty, debouncedSearchQuery]);
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+    };
+
+    const handleCategoryChange = (category: string) => {
+        setSelectedCategory(category);
+        setCurrentPage(1);
+    };
+
+    const handleDifficultyChange = (difficulty: string) => {
+        setSelectedDifficulty(difficulty);
+        setCurrentPage(1);
+    };
+
+    const handleSearch = (query: string) => {
+        setSearchQuery(query);
+        setCurrentPage(1);
+    };
 
     return (
-        <div>
+        <div className="flex flex-col container">
             <Navbar />
-            <div className="h-screen bg-background">
-                <ResizablePanelGroup
-                    direction="horizontal"
-                    className="rounded-lg border h-full"
+            <div className="mt-2 flex flex-col gap-8">
+                <Carousel
+                    opts={{
+                        align: "start",
+                    }}
+                    className="w-full z-0"
                 >
-                    <ResizablePanel defaultSize={40}>
-                        <Card className="h-full rounded-none border-0">
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-lg font-semibold">Problem Statement</CardTitle>
-                                    <Badge variant="secondary" className="text-xs">
-                                        Easy
-                                    </Badge>
+                    <CarouselContent className="-ml-1">
+                        {carouselItems.map((item, index) => (
+                            <CarouselItem key={index} className="pl-1 md:basis-1/2 lg:basis-1/3">
+                                <Image src={item.image} alt="problem-card" width={320} height={135} className="rounded-lg" />
+                            </CarouselItem>
+                        ))}
+                    </CarouselContent>
+                    <CarouselPrevious />
+                    <CarouselNext />
+                </Carousel>
+
+                <div className="flex flex-col gap-5">
+                    {/* Search Bar */}
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                            placeholder="Search by problem title, description, or category..."
+                            value={searchQuery}
+                            onChange={(e) => handleSearch(e.target.value)}
+                            className="pl-10"
+                        />
+                    </div>
+
+
+
+                    {/* Category and Difficulty Filters */}
+                    <div className="flex flex-row justify-between items-center border-b pb-5">
+                        <div className="flex flex-row gap-2">
+                            <Button
+                                variant={selectedCategory === "All" ? "default" : "outline"}
+                                className={cn(
+                                    "rounded-full",
+                                    selectedCategory === "All" && "bg-white text-black hover:bg-white hover:text-black"
+                                )}
+                                onClick={() => handleCategoryChange("All")}
+                            >
+                                All
+                            </Button>
+                            {categories.map((category) => (
+                                <Button
+                                    key={category.id}
+                                    variant={selectedCategory === category.name ? "default" : "outline"}
+                                    className={cn(
+                                        "rounded-full",
+                                        selectedCategory === category.name && "bg-white text-black hover:bg-white hover:text-black"
+                                    )}
+                                    onClick={() => handleCategoryChange(category.name)}
+                                >
+                                    {category.name}
+                                </Button>
+                            ))}
+                        </div>
+
+                        {/* Difficulty Filter Dropdown */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">Difficulty:</span>
+                            <Select value={selectedDifficulty} onValueChange={handleDifficultyChange}>
+                                <SelectTrigger className="w-[120px]">
+                                    <SelectValue placeholder="Select difficulty" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {difficulties.map((difficulty) => (
+                                        <SelectItem key={difficulty} value={difficulty}>
+                                            {difficulty}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    {/* Active Filters Display */}
+                    {(selectedCategory !== "All" || selectedDifficulty !== "All" || searchQuery) && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>Active filters:</span>
+                            {selectedCategory !== "All" && (
+                                <Badge variant="secondary" className="text-xs">
+                                    Category: {selectedCategory}
+                                </Badge>
+                            )}
+                            {selectedDifficulty !== "All" && (
+                                <Badge variant="secondary" className="text-xs">
+                                    Difficulty: {selectedDifficulty}
+                                </Badge>
+                            )}
+                            {searchQuery && (
+                                <Badge variant="secondary" className="text-xs">
+                                    Search: "{searchQuery}"
+                                </Badge>
+                            )}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    setSelectedCategory("All");
+                                    setSelectedDifficulty("All");
+                                    setSearchQuery("");
+                                    setCurrentPage(1);
+                                }}
+                                className="text-xs h-6 px-2"
+                            >
+                                Clear all
+                            </Button>
+                        </div>
+                    )}
+
+
+
+                    {/* Problems List */}
+                    <div className="flex flex-col gap-2">
+                        {/* Results Count */}
+                        {!isLoading && problems.length > 0 && (
+                            <div className="flex items-center justify-between text-sm text-muted-foreground">
+                                <span>
+                                    Showing {problems.length} problem{problems.length !== 1 ? 's' : ''}
+                                    {totalPages > 1 && ` (page ${currentPage} of ${totalPages})`}
+                                </span>
+                                {totalPages > 1 && (
+                                    <span>
+                                        Total: {totalPages * 10} problems
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                        {isLoading ? (
+                            <div className="flex justify-center items-center py-8">
+                                <Loader2 className="h-8 w-8 animate-spin" />
+                            </div>
+                        ) : problems.length === 0 ? (
+                            <div className="text-center py-12">
+                                <div className="text-gray-400 mb-4">
+                                    <Search className="h-16 w-16 mx-auto opacity-50" />
                                 </div>
-                            </CardHeader>
-                            <CardContent className="p-0 h-full">
-                                <ScrollArea className="h-full px-6 pb-6">
-                                    <Textarea
-                                        value={problemStatement}
-                                        onChange={(e) => setProblemStatement(e.target.value)}
-                                        className="min-h-[500px] resize-none border-0 shadow-none focus-visible:ring-0 text-sm leading-relaxed"
-                                        placeholder="Enter problem statement here..."
-                                    />
-                                </ScrollArea>
-                            </CardContent>
-                        </Card>
-                    </ResizablePanel>
-                    <ResizableHandle />
-                    <ResizablePanel defaultSize={60}>
-                        <ResizablePanelGroup direction="vertical">
-                            <ResizablePanel defaultSize={80}>
-                                <Card className="h-full rounded-none border-0">
-                                    <CardHeader className="pb-3">
-                                        <div className="flex items-center justify-between">
-                                            <CardTitle className="text-lg font-semibold">Code Editor</CardTitle>
-                                            <div className="flex items-center space-x-3">
-                                                <div className="flex items-center space-x-2">
-                                                    <span className="text-xs text-muted-foreground">Language:</span>
-                                                    <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
-                                                        <SelectTrigger className="w-32 h-8">
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {languages.map((language) => (
-                                                                <SelectItem key={language.value} value={language.value}>
-                                                                    {language.label}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <Button
-                                                    onClick={handleSubmit}
-                                                    disabled={isSubmitting}
-                                                    className="h-8 px-4 bg-green-600 hover:bg-green-700"
-                                                >
-                                                    <Play className="h-3 w-3 mr-1" />
-                                                    {isSubmitting ? 'Running...' : 'Submit'}
-                                                </Button>
+                                <h3 className="text-lg font-medium mb-2">
+                                    No problems found
+                                </h3>
+                                <p className="text-gray-500 mb-4">
+                                    {searchQuery || selectedCategory !== "All" || selectedDifficulty !== "All"
+                                        ? "Try adjusting your search criteria or filters."
+                                        : "There are no problems available at the moment."
+                                    }
+                                </p>
+                                {(searchQuery || selectedCategory !== "All" || selectedDifficulty !== "All") && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            setSelectedCategory("All");
+                                            setSelectedDifficulty("All");
+                                            setSearchQuery("");
+                                            setCurrentPage(1);
+                                        }}
+                                    >
+                                        Clear all filters
+                                    </Button>
+                                )}
+                            </div>
+                        ) : (
+                            problems.map((problem, index) => (
+                                <Link
+                                    href={`/problems/${problem.id}`}
+                                    key={problem.id}
+                                    className={cn(
+                                        "flex flex-row justify-between gap-2 px-10 py-3 rounded-md hover:bg-primary/5 transition-colors",
+                                        index % 2 === 0 && "bg-primary/10"
+                                    )}
+                                >
+                                    <div className="flex flex-row gap-4 items-center">
+                                        <p className="text-sm font-medium">{index + 1}</p>
+                                        <div className="flex flex-col gap-1">
+                                            <p className="text-sm font-medium">{problem.title}</p>
+                                            <div className="flex gap-2">
+                                                {problem.categories.map((cat) => (
+                                                    <Badge
+                                                        key={cat.id}
+                                                        variant="secondary"
+                                                        style={{ backgroundColor: cat.color + '20', color: cat.color }}
+                                                    >
+                                                        {cat.name}
+                                                    </Badge>
+                                                ))}
                                             </div>
                                         </div>
-                                        {submissionResult.status !== 'idle' && (
-                                            <div className="flex items-center space-x-2 text-sm">
-                                                {getStatusIcon()}
-                                                <span className={submissionResult.status === 'success' ? 'text-green-600' :
-                                                    submissionResult.status === 'error' ? 'text-red-600' :
-                                                        'text-yellow-600'}>
-                                                    {submissionResult.message}
-                                                </span>
-                                            </div>
-                                        )}
-                                    </CardHeader>
-                                    <CardContent className="p-0 h-full">
-                                        <div className="h-full">
-                                            <Editor
-                                                height="100%"
-                                                language={selectedLanguage}
-                                                value={code}
-                                                onChange={(value) => setCode(value || "")}
-                                                theme="vs-dark"
-                                                options={{
-                                                    minimap: { enabled: false },
-                                                    fontSize: 14,
-                                                    lineNumbers: "on",
-                                                    roundedSelection: false,
-                                                    scrollBeyondLastLine: false,
-                                                    automaticLayout: true,
-                                                    wordWrap: "on",
-                                                    folding: true,
-                                                    foldingStrategy: "indentation",
-                                                    padding: { top: 16, bottom: 16 },
-                                                    scrollbar: {
-                                                        vertical: 'visible',
-                                                        horizontal: 'visible',
-                                                    },
-                                                }}
-                                            />
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </ResizablePanel>
-                            <ResizableHandle />
-                            <ResizablePanel defaultSize={20}>
-                                <Card className="h-full rounded-none border-0">
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="text-lg font-semibold">Test Cases</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="p-0 h-full">
-                                        <ScrollArea className="h-full px-6 pb-6">
-                                            <div className="space-y-3">
-                                                <div className="p-3 bg-muted/50 rounded-lg border">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <span className="text-xs font-medium text-muted-foreground">Test Case 1</span>
-                                                        <Badge variant="outline" className="text-xs">Passed</Badge>
-                                                    </div>
-                                                    <div className="text-xs space-y-1">
-                                                        <div><strong>Input:</strong> nums = [2,7,11,15], target = 9</div>
-                                                        <div><strong>Expected:</strong> [0,1]</div>
-                                                        <div><strong>Output:</strong> [0,1]</div>
-                                                    </div>
-                                                </div>
+                                    </div>
+                                    <div className="flex flex-row gap-5 items-center">
+                                        <p className="text-sm text-gray-500">
+                                            {problem.timeLimit}ms / {problem.memoryLimit}MB
+                                        </p>
+                                        <p className={cn(
+                                            "text-sm font-medium",
+                                            isDifficultyMatch(problem.difficulty, "Easy") && "text-green-500",
+                                            isDifficultyMatch(problem.difficulty, "Medium") && "text-yellow-500",
+                                            isDifficultyMatch(problem.difficulty, "Hard") && "text-red-500"
+                                        )}>
+                                            {problem.difficulty}
+                                        </p>
+                                    </div>
+                                </Link>
+                            ))
+                        )}
+                    </div>
 
-                                                <div className="p-3 bg-muted/50 rounded-lg border">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <span className="text-xs font-medium text-muted-foreground">Test Case 2</span>
-                                                        <Badge variant="outline" className="text-xs">Passed</Badge>
-                                                    </div>
-                                                    <div className="text-xs space-y-1">
-                                                        <div><strong>Input:</strong> nums = [3,2,4], target = 6</div>
-                                                        <div><strong>Expected:</strong> [1,2]</div>
-                                                        <div><strong>Output:</strong> [1,2]</div>
-                                                    </div>
-                                                </div>
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-center mt-6">
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    Previous
+                                </Button>
 
-                                                <div className="p-3 bg-muted/50 rounded-lg border">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <span className="text-xs font-medium text-muted-foreground">Test Case 3</span>
-                                                        <Badge variant="outline" className="text-xs">Passed</Badge>
-                                                    </div>
-                                                    <div className="text-xs space-y-1">
-                                                        <div><strong>Input:</strong> nums = [3,3], target = 6</div>
-                                                        <div><strong>Expected:</strong> [0,1]</div>
-                                                        <div><strong>Output:</strong> [0,1]</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </ScrollArea>
-                                    </CardContent>
-                                </Card>
-                            </ResizablePanel>
-                        </ResizablePanelGroup>
-                    </ResizablePanel>
-                </ResizablePanelGroup>
+                                {/* Page numbers */}
+                                <div className="flex items-center gap-1">
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+
+                                        return (
+                                            <Button
+                                                key={pageNum}
+                                                variant={currentPage === pageNum ? "default" : "outline"}
+                                                size="sm"
+                                                className="w-8 h-8 p-0"
+                                                onClick={() => handlePageChange(pageNum)}
+                                            >
+                                                {pageNum}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
+                                    disabled={currentPage === totalPages}
+                                >
+                                    Next
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     )
-} 
+}

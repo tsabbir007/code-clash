@@ -74,7 +74,7 @@ export default function StatementPage() {
 
     if (isLoading) {
         return (
-            <div className="container mx-auto p-6">
+            <div>
                 <div className="flex items-center justify-center h-64">
                     <div className="text-lg">Loading problem...</div>
                 </div>
@@ -84,7 +84,7 @@ export default function StatementPage() {
 
     if (!problem) {
         return (
-            <div className="container mx-auto p-6">
+            <div>
                 <div className="flex items-center justify-center h-64">
                     <div className="text-lg text-red-500">Problem not found</div>
                 </div>
@@ -93,7 +93,7 @@ export default function StatementPage() {
     }
 
     return (
-        <div className="container mx-auto p-6">
+        <div>
             <div className="mb-6">
                 <h1 className="text-3xl font-bold mb-2">Problem Statement</h1>
                 <p className="text-muted-foreground">

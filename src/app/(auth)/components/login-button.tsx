@@ -1,8 +1,6 @@
 import { NavUser } from "@/components/navbar/nav-user";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { authClient } from "@/lib/auth-client";
-import { Loader2 } from "lucide-react";
 import Link from "next/link";
 
 interface LoginButtonProps {
@@ -42,8 +40,8 @@ const LoginButton = () => {
     return (
         <div className="flex items-center gap-2">
             {items.map((item, index) => (
-                <div className="flex items-center gap-2">
-                    <Button variant="ghost" asChild key={item.label}>
+                <div key={item.label} className="flex items-center gap-2">
+                    <Button variant="ghost" asChild>
                         <Link href={item.href}>
                             {item.label}
                         </Link>

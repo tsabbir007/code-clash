@@ -193,7 +193,7 @@ export default function TestCasesPage() {
 
     if (isLoading) {
         return (
-            <div className="container mx-auto p-6">
+            <div>
                 <div className="flex items-center justify-center h-64">
                     <div className="text-lg">Loading test cases...</div>
                 </div>
@@ -203,7 +203,7 @@ export default function TestCasesPage() {
 
     if (!problem) {
         return (
-            <div className="container mx-auto p-6">
+            <div>
                 <div className="flex items-center justify-center h-64">
                     <div className="text-lg text-red-500">Problem not found</div>
                 </div>
@@ -212,7 +212,7 @@ export default function TestCasesPage() {
     }
 
     return (
-        <div className="container mx-auto p-6">
+        <div>
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h1 className="text-3xl font-bold mb-2">Test Cases</h1>

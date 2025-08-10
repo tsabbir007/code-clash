@@ -8,7 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { SimpleEditor } from '@/components/tiptap-templates/simple/simple-editor';
-import { Copy } from 'lucide-react';
+import { Copy, Plus, X, Edit2, Save, X as CloseIcon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 interface TestCase {
     id: number;
@@ -22,6 +26,8 @@ interface TestCase {
 interface ProblemPreview {
     id: number;
     title: string;
+    description: string;
+    difficulty: string;
     statement: string;
     timeLimit: number;
     memoryLimit: number;
@@ -29,6 +35,21 @@ interface ProblemPreview {
     customChecker: string;
     createdAt: string;
     updatedAt: string;
+}
+
+interface Category {
+    id: number;
+    name: string;
+    description: string;
+    color: string;
+}
+
+interface ProblemCategory {
+    id: number;
+    categoryId: number;
+    categoryName: string;
+    categoryDescription: string;
+    categoryColor: string;
 }
 
 export default function PreviewProblemPage() {
@@ -40,9 +61,16 @@ export default function PreviewProblemPage() {
     const [totalTestCases, setTotalTestCases] = useState(0);
     const [hiddenTestCases, setHiddenTestCases] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [problemCategories, setProblemCategories] = useState<ProblemCategory[]>([]);
+    const [isEditingBasicInfo, setIsEditingBasicInfo] = useState(false);
+    const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+    const [isAddingCategory, setIsAddingCategory] = useState(false);
 
     useEffect(() => {
         fetchProblemPreview();
+        fetchCategories();
+        fetchProblemCategories();
     }, [problemId]);
 
     const fetchProblemPreview = async () => {
@@ -91,9 +119,118 @@ export default function PreviewProblemPage() {
         }
     };
 
+    const fetchCategories = async () => {
+        try {
+            const response = await fetch('/api/categories');
+            const data = await response.json();
+            if (data.success) {
+                setCategories(data.categories);
+            }
+        } catch (error) {
+            console.error('Error fetching categories:', error);
+        }
+    };
+
+    const fetchProblemCategories = async () => {
+        try {
+            const response = await fetch(`/api/problems/${problemId}/categories`);
+            const data = await response.json();
+            if (data.success) {
+                setProblemCategories(data.categories);
+            }
+        } catch (error) {
+            console.error('Error fetching problem categories:', error);
+        }
+    };
+
+    const createCategory = async (name: string, description: string, color: string) => {
+        try {
+            const response = await fetch('/api/categories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, description, color })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                toast.success('Category created successfully');
+                setIsCreatingCategory(false);
+                fetchCategories();
+            } else {
+                toast.error(data.error || 'Failed to create category');
+            }
+        } catch (error) {
+            console.error('Error creating category:', error);
+            toast.error('Failed to create category');
+        }
+    };
+
+    const addCategoryToProblem = async (categoryId: number) => {
+        try {
+            const response = await fetch(`/api/problems/${problemId}/categories`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ categoryId })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                toast.success('Category added to problem successfully');
+                setIsAddingCategory(false);
+                fetchProblemCategories();
+            } else {
+                toast.error(data.error || 'Failed to add category to problem');
+            }
+        } catch (error) {
+            console.error('Error adding category to problem:', error);
+            toast.error('Failed to add category to problem');
+        }
+    };
+
+    const removeCategoryFromProblem = async (categoryId: number) => {
+        try {
+            const response = await fetch(`/api/problems/${problemId}/categories?categoryId=${categoryId}`, {
+                method: 'DELETE'
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                toast.success('Category removed from problem successfully');
+                fetchProblemCategories();
+            } else {
+                toast.error(data.error || 'Failed to remove category from problem');
+            }
+        } catch (error) {
+            console.error('Error removing category from problem:', error);
+            toast.error('Failed to remove category from problem');
+        }
+    };
+
+    const updateBasicInfo = async (title: string, description: string, difficulty: string) => {
+        try {
+            const response = await fetch(`/api/problems/${problemId}/basic-info`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, description, difficulty })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                setProblem(data.problem);
+                toast.success('Problem updated successfully');
+                setIsEditingBasicInfo(false);
+            } else {
+                toast.error(data.error || 'Failed to update problem');
+            }
+        } catch (error) {
+            console.error('Error updating problem:', error);
+            toast.error('Failed to update problem');
+        }
+    };
+
     if (loading) {
         return (
-            <div className="container mx-auto p-6">
+            <div>
                 <Card>
                     <CardContent className="flex items-center justify-center py-12">
                         <div className="text-center">
@@ -108,7 +245,7 @@ export default function PreviewProblemPage() {
 
     if (!problem) {
         return (
-            <div className="container mx-auto p-6">
+            <div>
                 <Card>
                     <CardContent className="flex items-center justify-center py-12">
                         <div className="text-center">
@@ -126,17 +263,45 @@ export default function PreviewProblemPage() {
             <Card className="mb-6">
                 <CardHeader>
                     <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle className="text-2xl font-bold">{problem.title}</CardTitle>
-                            <p className="text-muted-foreground mt-2">Problem ID: {problem.id}</p>
+                        <div className="flex-1">
+                            {isEditingBasicInfo ? (
+                                <BasicInfoEditForm
+                                    problem={problem}
+                                    onSave={updateBasicInfo}
+                                    onCancel={() => setIsEditingBasicInfo(false)}
+                                />
+                            ) : (
+                                <div>
+                                    <CardTitle className="text-2xl font-bold">{problem.title}</CardTitle>
+                                    {problem.description && (
+                                        <p className="text-muted-foreground mt-2">{problem.description}</p>
+                                    )}
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <Badge variant="secondary">{problem.difficulty}</Badge>
+                                        <p className="text-muted-foreground">Problem ID: {problem.id}</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                        <div className="flex gap-2">
-                            <Badge variant="outline">
-                                {formatTimeLimit(problem.timeLimit)} time limit
-                            </Badge>
-                            <Badge variant="outline">
-                                {formatMemoryLimit(problem.memoryLimit)} memory limit
-                            </Badge>
+                        <div className="flex items-center gap-2">
+                            {!isEditingBasicInfo && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setIsEditingBasicInfo(true)}
+                                >
+                                    <Edit2 className="h-4 w-4 mr-2" />
+                                    Edit Info
+                                </Button>
+                            )}
+                            <div className="flex gap-2">
+                                <Badge variant="outline">
+                                    {formatTimeLimit(problem.timeLimit)} time limit
+                                </Badge>
+                                <Badge variant="outline">
+                                    {formatMemoryLimit(problem.memoryLimit)} memory limit
+                                </Badge>
+                            </div>
                         </div>
                     </div>
                 </CardHeader>
@@ -158,6 +323,78 @@ export default function PreviewProblemPage() {
                         </div>
                     ) : (
                         <p className="text-muted-foreground italic">No problem statement available.</p>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Categories */}
+            <Card className="mb-6">
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>Categories</CardTitle>
+                        <div className="flex gap-2">
+                            <Dialog open={isCreatingCategory} onOpenChange={setIsCreatingCategory}>
+                                <DialogTrigger asChild>
+                                    <Button variant="outline" size="sm">
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Create Category
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Create New Category</DialogTitle>
+                                    </DialogHeader>
+                                    <CreateCategoryForm onSave={createCategory} />
+                                </DialogContent>
+                            </Dialog>
+                            <Dialog open={isAddingCategory} onOpenChange={setIsAddingCategory}>
+                                <DialogTrigger asChild>
+                                    <Button variant="outline" size="sm">
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Add Category
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Add Category to Problem</DialogTitle>
+                                    </DialogHeader>
+                                    <AddCategoryForm
+                                        categories={categories}
+                                        existingCategories={problemCategories}
+                                        onSave={addCategoryToProblem}
+                                    />
+                                </DialogContent>
+                            </Dialog>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    {problemCategories.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                            {problemCategories.map((pc) => (
+                                <div
+                                    key={pc.id}
+                                    className="flex items-center gap-2 px-3 py-1 rounded-full border"
+                                    style={{ borderColor: pc.categoryColor, backgroundColor: `${pc.categoryColor}10` }}
+                                >
+                                    <span
+                                        className="w-2 h-2 rounded-full"
+                                        style={{ backgroundColor: pc.categoryColor }}
+                                    />
+                                    <span className="text-sm font-medium">{pc.categoryName}</span>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-4 w-4 p-0 hover:bg-red-100"
+                                        onClick={() => removeCategoryFromProblem(pc.categoryId)}
+                                    >
+                                        <X className="h-3 w-3 text-red-600" />
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-muted-foreground italic">No categories assigned to this problem.</p>
                     )}
                 </CardContent>
             </Card>
@@ -303,5 +540,217 @@ export default function PreviewProblemPage() {
                 </CardContent>
             </Card>
         </div>
+    );
+}
+
+// BasicInfoEditForm Component
+function BasicInfoEditForm({
+    problem,
+    onSave,
+    onCancel
+}: {
+    problem: ProblemPreview,
+    onSave: (title: string, description: string, difficulty: string) => void,
+    onCancel: () => void
+}) {
+    const [title, setTitle] = useState(problem.title);
+    const [description, setDescription] = useState(problem.description || '');
+    const [difficulty, setDifficulty] = useState(problem.difficulty);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (title.trim()) {
+            onSave(title.trim(), description.trim(), difficulty);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+                <label htmlFor="edit-title" className="block text-sm font-medium mb-2">
+                    Problem Title *
+                </label>
+                <Input
+                    id="edit-title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Enter problem title"
+                    required
+                />
+            </div>
+            <div>
+                <label htmlFor="edit-description" className="block text-sm font-medium mb-2">
+                    Description
+                </label>
+                <Textarea
+                    id="edit-description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Enter problem description"
+                    rows={3}
+                />
+            </div>
+            <div>
+                <label htmlFor="edit-difficulty" className="block text-sm font-medium mb-2">
+                    Difficulty
+                </label>
+                <Select value={difficulty} onValueChange={(value) => setDifficulty(value)}>
+                    <SelectTrigger>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="easy">Easy</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="hard">Hard</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="flex justify-end space-x-2 pt-4">
+                <Button type="button" variant="outline" onClick={onCancel}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={!title.trim()}>
+                    Save Changes
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+// CreateCategoryForm Component
+function CreateCategoryForm({ onSave }: { onSave: (name: string, description: string, color: string) => void }) {
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [color, setColor] = useState('#3B82F6');
+
+    const predefinedColors = [
+        '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
+        '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'
+    ];
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (name.trim() && description.trim()) {
+            onSave(name.trim(), description.trim(), color);
+            setName('');
+            setDescription('');
+            setColor('#3B82F6');
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+                <label htmlFor="category-name" className="block text-sm font-medium mb-2">
+                    Category Name *
+                </label>
+                <Input
+                    id="category-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Enter category name"
+                    required
+                />
+            </div>
+            <div>
+                <label htmlFor="category-description" className="block text-sm font-medium mb-2">
+                    Description *
+                </label>
+                <Textarea
+                    id="category-description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Enter category description"
+                    rows={3}
+                    required
+                />
+            </div>
+            <div>
+                <label className="block text-sm font-medium mb-2">Color</label>
+                <div className="grid grid-cols-5 gap-2">
+                    {predefinedColors.map((colorOption) => (
+                        <button
+                            key={colorOption}
+                            type="button"
+                            className={`w-8 h-8 rounded-full border-2 transition-all ${color === colorOption ? 'border-gray-800 scale-110' : 'border-gray-300 hover:scale-105'
+                                }`}
+                            style={{ backgroundColor: colorOption }}
+                            onClick={() => setColor(colorOption)}
+                        />
+                    ))}
+                </div>
+            </div>
+            <div className="flex justify-end space-x-2 pt-4">
+                <Button type="submit" disabled={!name.trim() || !description.trim()}>
+                    Create Category
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+// AddCategoryForm Component
+function AddCategoryForm({
+    categories,
+    existingCategories,
+    onSave
+}: {
+    categories: Category[],
+    existingCategories: ProblemCategory[],
+    onSave: (categoryId: number) => void
+}) {
+    const [selectedCategoryId, setSelectedCategoryId] = useState<number | ''>('');
+
+    const availableCategories = categories.filter(cat =>
+        !existingCategories.some(ec => ec.categoryId === cat.id)
+    );
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (selectedCategoryId && typeof selectedCategoryId === 'number') {
+            onSave(selectedCategoryId);
+            setSelectedCategoryId('');
+        }
+    };
+
+    if (availableCategories.length === 0) {
+        return (
+            <div className="text-center py-4">
+                <p className="text-muted-foreground">All available categories are already assigned to this problem.</p>
+            </div>
+        );
+    }
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+                <label htmlFor="category-select" className="block text-sm font-medium mb-2">
+                    Select Category
+                </label>
+                <Select value={selectedCategoryId.toString()} onValueChange={(value) => setSelectedCategoryId(parseInt(value) || '')}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Choose a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {availableCategories.map((category) => (
+                            <SelectItem key={category.id} value={category.id.toString()}>
+                                <div className="flex items-center gap-2">
+                                    <div
+                                        className="w-3 h-3 rounded-full"
+                                        style={{ backgroundColor: category.color }}
+                                    />
+                                    {category.name}
+                                </div>
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="flex justify-end space-x-2 pt-4">
+                <Button type="submit" disabled={!selectedCategoryId}>
+                    Add Category
+                </Button>
+            </div>
+        </form>
     );
 }

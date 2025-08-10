@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { problem, user } from '@/db/schema';
+import { problem, user, problemCategory, category } from '@/db/schema';
 import { auth } from '@/lib/auth';
 import { eq } from 'drizzle-orm';
 
@@ -69,12 +69,39 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // Get problems with user information
+        // Get pagination parameters from query string
+        const { searchParams } = new URL(request.url);
+        const page = parseInt(searchParams.get('page') || '1');
+        const perPage = parseInt(searchParams.get('perPage') || '10');
+
+        // Validate pagination parameters
+        if (page < 1 || perPage < 1 || perPage > 100) {
+            return NextResponse.json(
+                { error: 'Invalid pagination parameters' },
+                { status: 400 }
+            );
+        }
+
+        // Calculate offset
+        const offset = (page - 1) * perPage;
+
+        // Get total count of problems
+        const totalResult = await db.execute(
+            'SELECT COUNT(*) as total FROM problem'
+        );
+        const total = (totalResult as any)[0]?.total || 0;
+
+        // Get problems with user information and categories (paginated)
         const problems = await db
             .select({
                 id: problem.id,
                 title: problem.title,
+                description: problem.description,
+                difficulty: problem.difficulty,
                 statement: problem.statement,
+                timeLimit: problem.timeLimit,
+                memoryLimit: problem.memoryLimit,
+                checkerType: problem.checkerType,
                 createdAt: problem.createdAt,
                 updatedAt: problem.updatedAt,
                 userName: user.name,
@@ -82,11 +109,38 @@ export async function GET(request: NextRequest) {
             })
             .from(problem)
             .leftJoin(user, eq(problem.userId, user.id))
-            .orderBy(problem.createdAt);
+            .orderBy(problem.createdAt)
+            .limit(perPage)
+            .offset(offset);
+
+        // Get categories for each problem
+        const problemsWithCategories = await Promise.all(
+            problems.map(async (problemData) => {
+                const problemCategories = await db
+                    .select({
+                        categoryId: problemCategory.categoryId,
+                    })
+                    .from(problemCategory)
+                    .where(eq(problemCategory.problemId, problemData.id));
+
+                return {
+                    ...problemData,
+                    categories: problemCategories.map(pc => pc.categoryId)
+                };
+            })
+        );
 
         return NextResponse.json({
             success: true,
-            problems
+            problems: problemsWithCategories,
+            pagination: {
+                page,
+                perPage,
+                total,
+                totalPages: Math.ceil(total / perPage),
+                hasNextPage: page < Math.ceil(total / perPage),
+                hasPrevPage: page > 1
+            }
         });
 
     } catch (error) {

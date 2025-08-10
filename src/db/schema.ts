@@ -47,10 +47,28 @@ export const verification = pgTable("verification", {
 });
 
 // Problem Management Tables
+export const category = pgTable("category", {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull().unique(),
+  description: text('description'),
+  color: text('color').default('#3b82f6'),
+  createdAt: timestamp('created_at').$defaultFn(() => /* @__PURE__ */ new Date()).notNull(),
+  updatedAt: timestamp('updated_at').$defaultFn(() => /* @__PURE__ */ new Date()).notNull()
+});
+
+export const problemCategory = pgTable("problem_category", {
+  id: serial('id').primaryKey(),
+  problemId: integer('problem_id').notNull().references(() => problem.id, { onDelete: 'cascade' }),
+  categoryId: integer('category_id').notNull().references(() => category.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').$defaultFn(() => /* @__PURE__ */ new Date()).notNull()
+});
+
 export const problem = pgTable("problem", {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
   statement: text('statement'),
+  description: text('description'),
+  difficulty: text('difficulty').default('Easy'),
   userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
   timeLimit: integer('time_limit').default(1000), // milliseconds
   memoryLimit: integer('memory_limit').default(256), // kilobytes
@@ -106,7 +124,7 @@ export const submission = pgTable("submission", {
   score: integer('score').default(0),
   testCasesPassed: integer('test_cases_passed').default(0),
   totalTestCases: integer('total_test_cases').default(0),
-  type: text('type').default('Practice'), // Contest, Test, Practice
+  type: text('type').default('Practice'),
   createdAt: timestamp('created_at').$defaultFn(() => /* @__PURE__ */ new Date()).notNull()
 });
 

@@ -103,7 +103,7 @@ export default function LimitsPage() {
 
     if (isLoading) {
         return (
-            <div className="container mx-auto p-6">
+            <div>
                 <div className="flex items-center justify-center h-64">
                     <div className="text-lg">Loading limits...</div>
                 </div>
@@ -113,7 +113,7 @@ export default function LimitsPage() {
 
     if (!problem) {
         return (
-            <div className="container mx-auto p-6">
+            <div>
                 <div className="flex items-center justify-center h-64">
                     <div className="text-lg text-red-500">Problem not found</div>
                 </div>
@@ -122,7 +122,7 @@ export default function LimitsPage() {
     }
 
     return (
-        <div className="container mx-auto p-6">
+        <div>
             <div className="mb-6">
                 <h1 className="text-3xl font-bold mb-2">Problem Limits</h1>
                 <p className="text-muted-foreground">

@@ -54,7 +54,7 @@ const components: { title: string; href: string; description: string }[] = [
 export function Navbar() {
 
   return (
-    <div className="flex justify-between items-center p-4">
+    <div className="flex justify-between items-center py-4">
       <NavigationMenu viewport={false}>
         <NavigationMenuList>
           <NavigationMenuItem>
@@ -65,11 +65,6 @@ export function Navbar() {
           <NavigationMenuItem>
             <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
               <Link href="/problems">Problems</Link>
-            </NavigationMenuLink>
-          </NavigationMenuItem>
-          <NavigationMenuItem>
-            <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
-              <Link href="/problemset">Problemset</Link>
             </NavigationMenuLink>
           </NavigationMenuItem>
         </NavigationMenuList>
