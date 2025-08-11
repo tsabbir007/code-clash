@@ -4,25 +4,11 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Navbar } from "@/components/navbar/navbar"
+import { CodeEditor, ProblemStatement, SubmissionResult, SubmissionHistory } from "@/components/problem"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
-import { Loader2, Play, CheckCircle, XCircle, Clock, AlertTriangle, Loader, ChevronDownIcon, FileX } from "lucide-react"
-import { cn } from "@/lib/utils"
-
-// Utility function for case-insensitive difficulty comparison
-const normalizeDifficulty = (difficulty: string): string => {
-    if (!difficulty) return '';
-    return difficulty.toLowerCase();
-};
-
-const isDifficultyMatch = (problemDifficulty: string, filterDifficulty: string): boolean => {
-    return normalizeDifficulty(problemDifficulty) === normalizeDifficulty(filterDifficulty);
-};
+import { Loader, AlertTriangle, Clock } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 
 interface TestCaseResult {
     id: number;
@@ -89,13 +75,7 @@ export default function ProblemPage() {
     const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null)
     const [submissions, setSubmissions] = useState<SubmissionResult[]>([]);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-    const languages = [
-        { value: "python", label: "Python 3" },
-        { value: "cpp", label: "C++" },
-        { value: "java", label: "Java" },
-        { value: "javascript", label: "JavaScript" }
-    ]
+    const [viewingCode, setViewingCode] = useState<string | null>(null);
 
     const checkAuthStatus = async () => {
         try {
@@ -130,10 +110,6 @@ export default function ProblemPage() {
         }
     }
 
-
-
-
-
     const loadSubmissions = async () => {
         try {
             const response = await fetch(`/api/submissions?problemId=${problemId}`);
@@ -143,27 +119,26 @@ export default function ProblemPage() {
                 // Transform API submissions to match our interface
                 const transformedSubmissions: SubmissionResult[] = data.submissions.map((sub: any) => ({
                     id: sub.id.toString(),
-                    timestamp: new Date(sub.createdAt), // Fixed: use createdAt instead of submittedAt
+                    timestamp: new Date(sub.createdAt),
                     language: sub.language,
-                    code: sub.sourceCode, // Fixed: use sourceCode instead of code
-                    verdict: sub.verdict || 'Pending', // Default to 'Pending' if no verdict
+                    code: sub.sourceCode,
+                    verdict: sub.verdict || 'Pending',
                     testCasesPassed: sub.testCasesPassed || 0,
                     totalTestCases: sub.totalTestCases || (problem?.allTestCases?.length || 0),
                     score: sub.score || 0,
                     totalScore: (problem?.allTestCases?.length || 0) * 10,
-                    cpuTime: sub.cpuTime || 0, // Fixed: use cpuTime instead of executionTime
+                    cpuTime: sub.cpuTime || 0,
                     memoryUsage: sub.memoryUsage || 0,
-                    executionTime: sub.cpuTime || 0, // Fixed: use cpuTime
+                    executionTime: sub.cpuTime || 0,
                     memoryUsed: sub.memoryUsage || 0,
-                    testCaseResults: [] // Will be populated if available
+                    testCaseResults: []
                 }));
 
                 // Clean up any submissions that might be stuck in "Running..." state
                 const cleanedSubmissions = transformedSubmissions.map(sub => {
                     if (sub.verdict === 'Running...' || sub.verdict === 'Pending') {
-                        // If submission is older than 5 minutes, mark it as failed
                         const submissionAge = Date.now() - sub.timestamp.getTime();
-                        if (submissionAge > 5 * 60 * 1000) { // 5 minutes
+                        if (submissionAge > 5 * 60 * 1000) {
                             return {
                                 ...sub,
                                 verdict: 'System Error',
@@ -265,10 +240,7 @@ export default function ProblemPage() {
                     testCasesPassed: 0,
                     totalTestCases: testCaseResults.length,
                     score: 0,
-                    totalScore: testCaseResults.reduce((sum, tc) => {
-                        const problemTestCase = problem?.allTestCases?.find(ptc => ptc.id === tc.id);
-                        return sum + (problemTestCase?.points || 1);
-                    }, 0),
+                    totalScore: testCaseResults.length, // Just use total test case count
                     cpuTime: 0,
                     memoryUsage: 0,
                     executionTime: 0,
@@ -284,7 +256,6 @@ export default function ProblemPage() {
                 try {
                     setIsExecuting(true);
 
-                    // Debug: Log the URL being constructed
                     const executionUrl = `/api/problems/${problemId}/solutions/${solutionId}/execute`;
                     console.log('Debug - Execution URL:', executionUrl);
                     console.log('Debug - problemId:', problemId);
@@ -309,24 +280,25 @@ export default function ProblemPage() {
                             id: tc.testCaseId,
                             label: tc.testCaseLabel,
                             status: tc.verdict === 'AC' ? 'passed' : 'failed',
-                            input: '', // We don't need to show input in results
-                            expectedOutput: '', // We don't need to show expected output in results
+                            input: '',
+                            expectedOutput: '',
                             actualOutput: tc.verdict === 'AC' ? 'Correct' : 'Incorrect',
                             executionTime: tc.cpuTime,
                             memoryUsage: tc.memoryUsage,
                             error: tc.error
                         }));
 
-                        // Calculate score based on passed test cases
+                        // Calculate score based on passed test cases (simple ratio)
                         const passedCount = executionData.results.passedTests;
                         const totalCount = executionData.results.totalTests;
-                        const score = totalCount > 0 ? Math.floor((passedCount / totalCount) * 100) : 0;
+                        const score = passedCount; // Score is just the number of passed test cases
 
                         // Update submission result with real execution data
                         const finalSubmission = {
                             ...newSubmission,
                             verdict: executionData.results.overallVerdict === 'AC' ? 'Accepted' : 'Wrong Answer',
                             score: score,
+                            totalScore: totalCount, // Total score is total test cases
                             cpuTime: executionData.results.maxTime,
                             memoryUsage: executionData.results.maxMemory,
                             testCasesPassed: passedCount,
@@ -415,159 +387,20 @@ export default function ProblemPage() {
         }
     };
 
-    const getVerdictIcon = (verdict: string) => {
-        switch (verdict) {
-            case "Accepted":
-            case "AC":
-                return <CheckCircle className="h-5 w-5 text-green-500" />
-            case "Wrong Answer":
-            case "WA":
-                return <XCircle className="h-5 w-5 text-red-500" />
-            case "Time Limit Exceeded":
-            case "TLE":
-                return <Clock className="h-5 w-5 text-yellow-500" />
-            case "Memory Limit Exceeded":
-            case "MLE":
-                return <AlertTriangle className="h-5 w-5 text-orange-500" />
-            case "Runtime Error":
-            case "RE":
-                return <AlertTriangle className="h-5 w-5 text-red-600" />
-            case "Compilation Error":
-            case "CE":
-                return <FileX className="h-5 w-5 text-red-600" />
-            case "System Error":
-                return <AlertTriangle className="h-5 w-5 text-red-600" />
-            case "Running...":
-                return <Loader className="h-5 w-5 text-blue-500 animate-spin" />
-            case "Pending":
-                return <Clock className="h-5 w-5 text-gray-500" />
-            default:
-                return <AlertTriangle className="h-5 w-5 text-gray-500" />
-        }
-    }
-
-    const getVerdictColor = (verdict: string) => {
-        switch (verdict) {
-            case "Accepted":
-            case "AC":
-                return "text-green-500"
-            case "Wrong Answer":
-            case "WA":
-                return "text-red-500"
-            case "Time Limit Exceeded":
-            case "TLE":
-                return "text-yellow-500"
-            case "Memory Limit Exceeded":
-            case "MLE":
-                return "text-orange-500"
-            case "Runtime Error":
-            case "RE":
-                return "text-red-600"
-            case "Compilation Error":
-            case "CE":
-                return "text-red-600"
-            case "System Error":
-                return "text-red-600"
-            case "Running...":
-                return "text-blue-500"
-            case "Pending":
-                return "text-gray-500"
-            default:
-                return "text-gray-500"
-        }
-    }
-
-    const getTestStatusIcon = (status: string) => {
-        switch (status) {
-            case 'pending':
-                return <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
-            case 'running':
-                return <Loader className="w-4 h-4 text-blue-500 animate-spin" />
-            case 'passed':
-                return <CheckCircle className="w-4 h-4 text-green-500" />
-            case 'failed':
-                return <XCircle className="w-4 h-4 text-red-500" />
-            default:
-                return <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
-        }
-    }
-
-    const getTestStatusColor = (status: string) => {
-        switch (status) {
-            case 'pending':
-                return 'text-gray-500'
-            case 'running':
-                return 'text-blue-500'
-            case 'passed':
-                return 'text-green-500'
-            case 'failed':
-                return 'text-red-500'
-            default:
-                return 'text-gray-500'
-        }
-    }
-
-    const formatTimestamp = (timestamp: Date) => {
-        // Safety check for invalid dates
-        if (!timestamp || isNaN(timestamp.getTime())) {
-            return 'Invalid date';
-        }
-
-        return new Intl.DateTimeFormat('en-US', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-        }).format(timestamp);
+    const handleViewCode = (code: string) => {
+        setViewingCode(code);
     };
 
-    const getLanguageDisplayName = (lang: string) => {
-        const langObj = languages.find(l => l.value === lang);
-        return langObj ? langObj.label : lang;
+    const handleViewSubmission = (submission: SubmissionResult) => {
+        setSubmissionResult(submission);
+        // Scroll to submission result
+        setTimeout(() => {
+            const element = document.getElementById('submission-result');
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth' });
+            }
+        }, 100);
     };
-
-    // Helper function to get code templates for different languages
-    const getCodeTemplate = (lang: string): string => {
-        switch (lang) {
-            case 'python':
-                return `# Python solution
-def solve():
-    # Your code here
-    pass
-
-if __name__ == "__main__":
-    solve()`;
-            case 'cpp':
-                return `#include <iostream>
-using namespace std;
-
-int main() {
-    // Your code here
-    
-    return 0;
-}`;
-            case 'java':
-                return `public class Solution {
-    public static void main(String[] args) {
-        // Your code here
-        
-    }
-}`;
-            case 'javascript':
-                return `// JavaScript solution
-function solve() {
-    // Your code here
-}
-
-solve();`;
-            default:
-                return `// ${lang} solution
-// Your code here`;
-        }
-    };
-
-
 
     useEffect(() => {
         if (problemId) {
@@ -589,7 +422,7 @@ solve();`;
             setSubmissions(prev => prev.map(sub => {
                 if (sub.verdict === 'Running...' || sub.verdict === 'Pending') {
                     const submissionAge = Date.now() - sub.timestamp.getTime();
-                    if (submissionAge > 5 * 60 * 1000) { // 5 minutes
+                    if (submissionAge > 5 * 60 * 1000) {
                         return {
                             ...sub,
                             verdict: 'System Error',
@@ -599,19 +432,25 @@ solve();`;
                 }
                 return sub;
             }));
-        }, 60000); // Check every minute
+        }, 60000);
 
         return () => clearInterval(cleanupInterval);
     }, []);
 
     if (isLoading) {
         return (
-            <div className="flex flex-col container">
+            <div className="flex flex-col min-h-screen">
                 <Navbar />
-                <div className="flex justify-center items-center py-20">
-                    <div className="flex items-center gap-2">
-                        <Loader className="w-6 h-6 animate-spin" />
-                        <span>Loading problem...</span>
+                <div className="flex-1 flex justify-center items-center">
+                    <div className="text-center space-y-6">
+                        <div className="relative">
+                            <div className="w-16 h-16 border-4 border-gray-200 dark:border-gray-700 rounded-full animate-pulse"></div>
+                            <div className="absolute inset-0 w-16 h-16 border-4 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                        <div className="space-y-2">
+                            <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300">Loading Problem</h2>
+                            <p className="text-gray-500 dark:text-gray-400">Preparing your coding environment...</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -620,303 +459,177 @@ solve();`;
 
     if (!problem) {
         return (
-            <div className="flex flex-col container">
+            <div className="flex flex-col min-h-screen">
                 <Navbar />
-                <div className="text-center py-20">
-                    <h1 className="text-2xl font-bold text-red-500">Problem not found</h1>
-                    <p className="text-gray-500 mt-2">The problem you&apos;re looking for doesn&apos;t exist.</p>
+                <div className="flex-1 flex justify-center items-center">
+                    <div className="text-center space-y-6 max-w-md mx-auto px-6">
+                        <div className="w-20 h-20 mx-auto bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
+                            <AlertTriangle className="w-10 h-10 text-red-500" />
+                        </div>
+                        <div className="space-y-3">
+                            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Problem Not Found</h1>
+                            <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                                The problem you're looking for doesn't exist or may have been removed.
+                            </p>
+                        </div>
+                        <Link
+                            href="/problems"
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition-all duration-200 hover:shadow-lg hover:scale-105"
+                        >
+                            Browse Problems
+                        </Link>
+                    </div>
                 </div>
             </div>
         )
     }
 
     return (
-        <div className="flex flex-col">
+        <div className="flex flex-col min-h-screen">
             <Navbar />
-            <div>
-                <div className="mx-auto">
-                    {/* Problem Header */}
-                    <div className="mb-8">
-                        <div className="flex items-center justify-between mb-4">
-                            <h1 className="text-3xl font-bold">{problem.title}</h1>
-                            <div className="flex items-center gap-2">
-                                {problem.categories && problem.categories.map((cat) => (
-                                    <Badge key={cat.id} variant="secondary" style={{ backgroundColor: cat.color }}>
-                                        {cat.name}
-                                    </Badge>
-                                ))}
+
+            <div className="flex-1 mx-auto w-full">
+                {/* Page Header */}
+                <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/50 dark:via-indigo-950/50 dark:to-purple-950/50 border border-blue-200/60 dark:border-blue-800/40 rounded-2xl shadow-lg">
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                        <div className="space-y-4">
+                            <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
+                                {problem.title}
+                            </h1>
+                            <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600 dark:text-gray-300">
+                                <span className="flex items-center gap-3 px-4 py-2 bg-white/80 dark:bg-gray-800/80 rounded-lg border border-blue-200/60 dark:border-blue-700/40 shadow-sm">
+                                    <div className={`w-3 h-3 rounded-full ${problem.difficulty === 'Easy' ? 'bg-green-500' :
+                                        problem.difficulty === 'Medium' ? 'bg-yellow-500' :
+                                            'bg-red-500'
+                                        }`}></div>
+                                    <span className="font-medium">{problem.difficulty}</span>
+                                </span>
+                                <span className="flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 rounded-lg border border-blue-200/60 dark:border-blue-700/40 shadow-sm">
+                                    <Clock className="w-4 h-4" />
+                                    <span className="font-medium">{problem.timeLimit}ms</span>
+                                </span>
+                                <span className="flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 rounded-lg border border-blue-200/60 dark:border-blue-700/40 shadow-sm">
+                                    <div className="w-4 h-4 bg-purple-500 rounded-full"></div>
+                                    <span className="font-medium">{problem.memoryLimit}MB</span>
+                                </span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span>Difficulty: <Badge variant={isDifficultyMatch(problem.difficulty, 'Easy') ? 'default' : isDifficultyMatch(problem.difficulty, 'Medium') ? 'secondary' : 'destructive'}>{problem.difficulty}</Badge></span>
-                            <span>Time Limit: {problem.timeLimit}ms</span>
-                            <span>Memory Limit: {problem.memoryLimit}MB</span>
+                        <div className="flex flex-wrap items-center gap-3">
+                            {problem.categories.map((category) => (
+                                <span
+                                    key={category.id}
+                                    className="px-4 py-2 bg-white/80 dark:bg-gray-800/80 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-lg border border-blue-200/60 dark:border-blue-700/40 hover:bg-white dark:hover:bg-gray-700 transition-all duration-200 shadow-sm hover:shadow-md"
+                                >
+                                    {category.name}
+                                </span>
+                            ))}
                         </div>
-                    </div>
-
-                    {/* Two Column Layout: Problem Statement on Left, Code Editor on Right */}
-                    <div className="h-[600px] border rounded-lg mb-8">
-                        <ResizablePanelGroup direction="horizontal">
-                            {/* Left Panel: Problem Statement */}
-                            <ResizablePanel defaultSize={50} minSize={40}>
-                                <div className="h-full p-4 border-r overflow-y-auto">
-                                    <h2 className="text-xl font-semibold mb-4">Problem Statement</h2>
-                                    <div
-                                        className="prose max-w-none"
-                                        dangerouslySetInnerHTML={{ __html: problem.statement }}
-                                    />
-
-                                    {/* All Test Cases */}
-                                    {problem.allTestCases && problem.allTestCases.length > 0 && (
-                                        <div className="mt-6">
-                                            <h3 className="text-lg font-semibold mb-3">Test Cases</h3>
-                                            <div className="space-y-3">
-                                                {problem.allTestCases.map((testCase, index) => (
-                                                    <div key={testCase.id} className="bg-card p-3 rounded-lg border">
-                                                        <h4 className="font-medium mb-2">Test Case {index + 1}</h4>
-                                                        <div className="grid grid-cols-1 gap-3">
-                                                            <div>
-                                                                <h5 className="font-medium text-sm text-gray-600 mb-1">Input:</h5>
-                                                                <pre className="bg-muted p-2 rounded text-xs overflow-x-auto whitespace-pre-wrap break-words">{testCase.input}</pre>
-                                                            </div>
-                                                            <div>
-                                                                <h5 className="font-medium text-sm text-gray-600 mb-1">Expected Output:</h5>
-                                                                <pre className="bg-muted p-2 rounded text-xs overflow-x-auto whitespace-pre-wrap break-words">{testCase.output}</pre>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </ResizablePanel>
-
-                            <ResizableHandle withHandle />
-
-                            {/* Right Panel: Code Editor and Submission */}
-                            <ResizablePanel defaultSize={50} minSize={40}>
-                                <div className="h-full p-4 overflow-y-auto">
-                                    <h2 className="text-xl font-semibold mb-4">Submit Your Solution</h2>
-
-                                    {/* Language Selection */}
-                                    <div className="mb-4">
-                                        <label htmlFor="language" className="block text-sm font-medium mb-2">
-                                            Programming Language
-                                        </label>
-                                        <Select value={language} onValueChange={setLanguage}>
-                                            <SelectTrigger className="w-48">
-                                                <SelectValue placeholder="Select language" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="cpp">C++</SelectItem>
-                                                <SelectItem value="java">Java</SelectItem>
-                                                <SelectItem value="python">Python</SelectItem>
-                                                <SelectItem value="javascript">JavaScript</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {/* Code Editor */}
-                                    <div className="mb-4">
-                                        <label htmlFor="code" className="block text-sm font-medium mb-2">
-                                            Your Code
-                                        </label>
-                                        <Textarea
-                                            id="code"
-                                            value={code}
-                                            onChange={(e) => setCode(e.target.value)}
-                                            placeholder={`Enter your ${getLanguageDisplayName(language)} code here...`}
-                                            className="font-mono text-sm min-h-[300px] max-h-[400px] resize-y overflow-y-auto"
-                                        />
-                                    </div>
-
-                                    {/* Login Prompt */}
-                                    {!isAuthenticated && (
-                                        <div className="mb-4 p-4 bg-yellow-900/20 border border-yellow-700/30 rounded-lg">
-                                            <div className="flex items-center gap-2 text-yellow-200">
-                                                <AlertTriangle className="h-5 w-5" />
-                                                <span className="font-medium">Login Required</span>
-                                            </div>
-                                            <p className="text-sm text-yellow-300 mt-1">
-                                                You need to be logged in to submit your solution. Please log in or create an account to continue.
-                                            </p>
-                                            <div className="mt-3">
-                                                <Button asChild variant="outline" size="sm">
-                                                    <Link href="/login">Log In</Link>
-                                                </Button>
-                                                <Button asChild variant="outline" size="sm" className="ml-2">
-                                                    <Link href="/register">Register</Link>
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Submit Button */}
-                                    <Button
-                                        onClick={handleSubmit}
-                                        disabled={isSubmitting || !code.trim()}
-                                        className="w-full sm:w-auto"
-                                    >
-                                        {isSubmitting ? (
-                                            <>
-                                                <Loader className="w-4 h-4 mr-2 animate-spin" />
-                                                Submitting...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Play className="w-4 h-4 mr-2" />
-                                                Submit Solution
-                                            </>
-                                        )}
-                                    </Button>
-
-                                    {/* Submission Result */}
-                                    {submissionResult && (
-                                        <div className="mt-6 p-4 bg-card border rounded-lg max-h-[300px] overflow-y-auto">
-                                            <h3 className="text-lg font-semibold mb-3">Submission Result</h3>
-                                            <div className="flex items-center gap-3 mb-3">
-                                                {getVerdictIcon(submissionResult.verdict)}
-                                                <span className={`font-medium ${getVerdictColor(submissionResult.verdict)}`}>
-                                                    {submissionResult.verdict}
-                                                </span>
-                                                <span className="text-sm text-muted-foreground">
-                                                    {submissionResult.testCasesPassed}/{submissionResult.totalTestCases} test cases passed
-                                                </span>
-                                            </div>
-
-                                            {/* Test Case Results */}
-                                            {submissionResult.testCaseResults && submissionResult.testCaseResults.length > 0 && (
-                                                <div className="space-y-2">
-                                                    <h4 className="font-medium">Test Case Results:</h4>
-                                                    {submissionResult.testCaseResults.map((testCase, index) => (
-                                                        <div key={index} className="bg-muted p-3 rounded-lg">
-                                                            <div className="flex items-center gap-2 text-sm mb-2">
-                                                                <div className={`w-4 h-4 rounded-full flex items-center justify-center ${getTestStatusColor(testCase.status)}`}>
-                                                                    {getTestStatusIcon(testCase.status)}
-                                                                </div>
-                                                                <span className="font-medium">Test {index + 1}:</span>
-                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${testCase.status === 'passed' ? 'bg-green-100 text-green-800' :
-                                                                    testCase.status === 'failed' ? 'bg-red-100 text-red-800' :
-                                                                        'bg-gray-100 text-gray-800'
-                                                                    }`}>
-                                                                    {testCase.status === 'passed' ? 'Passed' :
-                                                                        testCase.status === 'failed' ? 'Failed' :
-                                                                            testCase.status === 'running' ? 'Running...' : 'Pending'}
-                                                                </span>
-                                                            </div>
-
-                                                            {/* Test Case Details */}
-                                                            <div className="grid grid-cols-2 gap-4 text-xs">
-                                                                <div>
-                                                                    <span className="text-muted-foreground">CPU Time:</span>
-                                                                    <span className="ml-2 font-mono">
-                                                                        {testCase.executionTime !== undefined ? `${testCase.executionTime}ms` : 'N/A'}
-                                                                    </span>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="text-muted-foreground">Memory:</span>
-                                                                    <span className="ml-2 font-mono">
-                                                                        {testCase.memoryUsage !== undefined ? `${testCase.memoryUsage}MB` : 'N/A'}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Error Message if Failed */}
-                                                            {testCase.status === 'failed' && testCase.error && (
-                                                                <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded">
-                                                                    <span className="font-medium">Error:</span> {testCase.error}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {/* Execution Details */}
-                                            <div className="text-sm text-muted-foreground mt-3">
-                                                <div>Execution Time: {submissionResult.executionTime}ms</div>
-                                                <div>Memory Used: {submissionResult.memoryUsed}MB</div>
-                                                <div>Submitted at: {formatTimestamp(submissionResult.timestamp)}</div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </ResizablePanel>
-                        </ResizablePanelGroup>
-                    </div>
-
-                    {/* Submission List at Bottom */}
-                    <div className="border rounded-lg p-4 max-h-[500px] overflow-y-auto">
-                        <h2 className="text-xl font-semibold mb-4">Submission History ({submissions?.length || 0})</h2>
-
-                        {!submissions || submissions.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground">
-                                {submissions === null ? (
-                                    <div className="flex items-center justify-center gap-2">
-                                        <Loader className="w-4 h-4 animate-spin" />
-                                        Loading submissions...
-                                    </div>
-                                ) : (
-                                    'No submissions yet. Submit your first solution above!'
-                                )}
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {submissions && submissions.map((submission, index) => (
-                                    <div key={index} className="bg-card p-4 rounded-lg border">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div className="flex items-center gap-3">
-                                                {getVerdictIcon(submission.verdict)}
-                                                <span className={`font-medium ${getVerdictColor(submission.verdict)}`}>
-                                                    {submission.verdict}
-                                                </span>
-                                            </div>
-                                            <span className="text-sm text-muted-foreground">
-                                                {formatTimestamp(submission.timestamp)}
-                                            </span>
-                                        </div>
-
-                                        <div className="text-sm text-muted-foreground mb-3">
-                                            <span>Language: {getLanguageDisplayName(submission.language)}</span>
-                                            <span className="mx-2">•</span>
-                                            <span>Time: {submission.executionTime}ms</span>
-                                            <span className="mx-2">•</span>
-                                            <span>Memory: {submission.memoryUsed}MB</span>
-                                        </div>
-
-                                        {/* Test Case Results Summary */}
-                                        {submission.testCaseResults && submission.testCaseResults.length > 0 && (
-                                            <div className="space-y-2">
-                                                <div className="text-sm text-muted-foreground">
-                                                    {submission.testCaseResults.filter(tc => tc.status === 'passed').length} passed,
-                                                    {submission.testCaseResults.filter(tc => tc.status === 'failed').length} failed
-                                                </div>
-
-                                                {/* Individual Test Case Details */}
-                                                <div className="space-y-1">
-                                                    {submission.testCaseResults.map((testCase, index) => (
-                                                        <div key={index} className="flex items-center justify-between text-xs bg-muted/50 p-2 rounded">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className={`w-3 h-3 rounded-full ${getTestStatusColor(testCase.status)}`}></div>
-                                                                <span>Test {index + 1}</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-3 text-muted-foreground">
-                                                                <span>CPU: {testCase.executionTime !== undefined ? `${testCase.executionTime}ms` : 'N/A'}</span>
-                                                                <span>Mem: {testCase.memoryUsage !== undefined ? `${testCase.memoryUsage}MB` : 'N/A'}</span>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
                     </div>
                 </div>
+
+                {/* Main Layout */}
+                <div className="h-[calc(100vh-120px)] sm:h-[calc(100vh-100px)] border border-gray-200/60 dark:border-gray-700/60 rounded-2xl bg-white dark:bg-gray-900 shadow-xl overflow-hidden">
+                    <ResizablePanelGroup direction="horizontal" className="h-full">
+                        {/* Left Panel: Problem Statement */}
+                        <ResizablePanel defaultSize={50} minSize={35} className="relative">
+                            <div className="h-full flex flex-col">
+                                <div className="flex-shrink-0 p-6 border-b border-gray-200/60 dark:border-gray-700/60 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900/50">
+                                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Problem Statement</h2>
+                                </div>
+                                <div className="flex-1 overflow-hidden">
+                                    <ProblemStatement
+                                        title={problem.title}
+                                        statement={problem.statement}
+                                        difficulty={problem.difficulty}
+                                        timeLimit={problem.timeLimit}
+                                        memoryLimit={problem.memoryLimit}
+                                        categories={problem.categories}
+                                        testCases={problem.allTestCases}
+                                    />
+                                </div>
+                            </div>
+                        </ResizablePanel>
+
+                        <ResizableHandle withHandle className="bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors duration-200 w-1" />
+
+                        {/* Right Panel: Code Editor */}
+                        <ResizablePanel defaultSize={50} minSize={35} className="relative">
+                            <div className="h-full flex flex-col">
+                                
+                                <div className="flex-1 overflow-hidden">
+                                    <CodeEditor
+                                        code={code}
+                                        onCodeChange={setCode}
+                                        language={language}
+                                        onLanguageChange={setLanguage}
+                                        onSubmit={handleSubmit}
+                                        isSubmitting={isSubmitting || isExecuting}
+                                        isAuthenticated={isAuthenticated}
+                                        onLoginClick={() => window.location.href = '/login'}
+                                        onRegisterClick={() => window.location.href = '/register'}
+                                    />
+                                </div>
+                            </div>
+                        </ResizablePanel>
+                    </ResizablePanelGroup>
+                </div>
+
+                {/* Submission Result */}
+                {submissionResult && (
+                    <div id="submission-result" className="mt-10 animate-in slide-in-from-bottom-4 duration-500">
+                        <div className="mb-4">
+                            <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Latest Submission</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Results from your most recent code execution</p>
+                        </div>
+                        <SubmissionResult
+                            submission={submissionResult}
+                            onViewCode={handleViewCode}
+                        />
+                    </div>
+                )}
+
+                {/* Submission History */}
+                <div className="mt-10">
+                    <div className="mb-4">
+                        <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Submission History</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Track your previous attempts and improvements</p>
+                    </div>
+                    <SubmissionHistory
+                        submissions={submissions}
+                        onViewCode={handleViewCode}
+                        onViewSubmission={handleViewSubmission}
+                    />
+                </div>
             </div>
+
+            {/* Code Viewer Modal */}
+            {viewingCode && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-6">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden border border-gray-200/60 dark:border-gray-700/60">
+                        <div className="flex items-center justify-between p-6 border-b border-gray-200/60 dark:border-gray-700/60 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900/50">
+                            <div className="flex items-center gap-3">
+                                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Submitted Code</h3>
+                                <Badge variant="secondary" className="ml-2">
+                                    {language.toUpperCase()}
+                                </Badge>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setViewingCode(null)}
+                                className="h-10 w-10 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200 hover:scale-105"
+                            >
+                                <span className="text-xl">×</span>
+                            </Button>
+                        </div>
+                        <div className="p-6 overflow-auto max-h-[calc(90vh-120px)]">
+                            <pre className="bg-gray-50 dark:bg-gray-800 p-6 rounded-xl text-sm overflow-x-auto whitespace-pre-wrap border border-gray-200/60 dark:border-gray-700/60 font-mono leading-relaxed text-gray-900 dark:text-gray-100">
+                                {viewingCode}
+                            </pre>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
