@@ -1,63 +1,76 @@
+"use client";
+
 import {
     LayoutDashboard,
-    Eye,
+    Settings,
     FileText,
-    TestTube,
-    Timer,
+    MessageSquare,
+    Megaphone,
     Users,
-    CheckSquare,
-    Code,
-    Upload
+    Wrench,
+    Trophy,
+    Shield
 } from "lucide-react";
 
 import AdminLayout from "../components/layout/admin-layout";
+import { useContestStats } from "@/hooks/use-contest-stats";
 
 const ContestsLayout = ({ children }: { children: React.ReactNode }) => {
+    // For demo purposes, using a default contest ID
+    // In a real app, this would come from the current contest context
+    const { stats } = useContestStats("1");
+
     const dashboardItems = [
         {
             icon: <LayoutDashboard className="w-4 h-4" />,
             name: "Overview",
-            href: "/overview",
+            href: "/admin/contests/overview",
         },
         {
-            icon: <Eye className="w-4 h-4" />,
-            name: "Preview Problems",
-            href: "/preview-problems",
+            icon: <Settings className="w-4 h-4" />,
+            name: "Settings",
+            href: "/admin/contests/settings",
         },
         {
             icon: <FileText className="w-4 h-4" />,
-            name: "Statements",
-            href: "/statements",
+            name: "Problems",
+            href: "/admin/contests/problems",
+            badge: stats.problems,
         },
         {
-            icon: <TestTube className="w-4 h-4" />,
-            name: "Test Cases",
-            href: "/test-cases",
+            icon: <MessageSquare className="w-4 h-4" />,
+            name: "Clearifications",
+            href: "/admin/contests/clearifications",
+            badge: stats.clarifications,
         },
         {
-            icon: <Timer className="w-4 h-4" />,
-            name: "Limits",
-            href: "/limits",
+            icon: <Megaphone className="w-4 h-4" />,
+            name: "Announcements",
+            href: "/admin/contests/announcements",
+            badge: stats.announcements,
         },
         {
             icon: <Users className="w-4 h-4" />,
-            name: "Moderators",
-            href: "/moderators",
+            name: "Participants",
+            href: "/admin/contests/participants",
+            badge: stats.participants,
         },
         {
-            icon: <CheckSquare className="w-4 h-4" />,
-            name: "Checkers & Validators",
-            href: "/checkers",
-        },
-        {
-            icon: <Code className="w-4 h-4" />,
-            name: "Solutions",
-            href: "/solutions",
-        },
-        {
-            icon: <Upload className="w-4 h-4" />,
+            icon: <Wrench className="w-4 h-4" />,
             name: "Submissions",
-            href: "/submissions",
+            href: "/admin/contests/submissions",
+            badge: stats.submissions,
+        },
+        {
+            icon: <Trophy className="w-4 h-4" />,
+            name: "Standings",
+            href: "/admin/contests/standings",
+        },
+        {
+            icon: <Shield className="w-4 h-4" />,
+            name: "Moderators",
+            href: "/admin/contests/moderators",
+            badge: stats.moderators,
         }
     ]
     return (

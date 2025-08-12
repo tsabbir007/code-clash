@@ -169,4 +169,67 @@ export const contestParticipant = pgTable("contest_participant", {
   joinedAt: timestamp('joined_at').$defaultFn(() => /* @__PURE__ */ new Date()).notNull()
 });
 
+export const contestModerator = pgTable("contest_moderator", {
+  id: serial('id').primaryKey(),
+  contestId: integer('contest_id').notNull().references(() => contest.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  permissions: text('permissions').default('full'), // full, limited, read-only
+  addedBy: text('added_by').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').$defaultFn(() => /* @__PURE__ */ new Date()).notNull()
+});
+
+export const contestAnnouncement = pgTable("contest_announcement", {
+  id: serial('id').primaryKey(),
+  contestId: integer('contest_id').notNull().references(() => contest.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  content: text('content').notNull(),
+  isImportant: boolean('is_important').default(false),
+  createdBy: text('created_by').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').$defaultFn(() => /* @__PURE__ */ new Date()).notNull(),
+  updatedAt: timestamp('updated_at').$defaultFn(() => /* @__PURE__ */ new Date()).notNull()
+});
+
+export const contestClarification = pgTable("contest_clarification", {
+  id: serial('id').primaryKey(),
+  contestId: integer('contest_id').notNull().references(() => contest.id, { onDelete: 'cascade' }),
+  problemId: integer('problem_id').references(() => problem.id, { onDelete: 'cascade' }), // null for general questions
+  question: text('question').notNull(),
+  answer: text('answer'),
+  status: text('status').default('pending'), // pending, answered, dismissed
+  askedBy: text('asked_by').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  answeredBy: text('answered_by').references(() => user.id, { onDelete: 'cascade' }),
+  askedAt: timestamp('asked_at').$defaultFn(() => /* @__PURE__ */ new Date()).notNull(),
+  answeredAt: timestamp('answered_at'),
+  isPublic: boolean('is_public').default(false) // whether other participants can see this
+});
+
+export const contestSubmission = pgTable("contest_submission", {
+  id: serial('id').primaryKey(),
+  contestId: integer('contest_id').notNull().references(() => contest.id, { onDelete: 'cascade' }),
+  problemId: integer('problem_id').notNull().references(() => problem.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  language: text('language').notNull(),
+  sourceCode: text('source_code').notNull(),
+  verdict: text('verdict').default('Pending'),
+  cpuTime: integer('cpu_time').default(0),
+  memoryUsage: integer('memory_usage').default(0),
+  score: integer('score').default(0),
+  testCasesPassed: integer('test_cases_passed').default(0),
+  totalTestCases: integer('total_test_cases').default(0),
+  submissionTime: timestamp('submission_time').$defaultFn(() => /* @__PURE__ */ new Date()).notNull(),
+  createdAt: timestamp('created_at').$defaultFn(() => /* @__PURE__ */ new Date()).notNull(),
+  submissionId: integer('submission_id').references(() => submission.id, { onDelete: 'cascade' }) // Reference to regular submission
+});
+
+export const contestStanding = pgTable("contest_standing", {
+  id: serial('id').primaryKey(),
+  contestId: integer('contest_id').notNull().references(() => contest.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  totalScore: integer('total_score').default(0),
+  problemsSolved: integer('problems_solved').default(0),
+  penalty: integer('penalty').default(0),
+  lastSubmissionTime: timestamp('last_submission_time'),
+  updatedAt: timestamp('updated_at').$defaultFn(() => /* @__PURE__ */ new Date()).notNull()
+});
+
 

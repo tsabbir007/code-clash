@@ -1,0 +1,2 @@
+ALTER TABLE "contest_submission" ADD COLUMN "submission_id" integer;--> statement-breakpoint
+ALTER TABLE "contest_submission" ADD CONSTRAINT "contest_submission_submission_id_submission_id_fk" FOREIGN KEY ("submission_id") REFERENCES "public"."submission"("id") ON DELETE cascade ON UPDATE no action;
