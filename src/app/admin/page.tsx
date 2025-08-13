@@ -329,7 +329,7 @@ export default function AdminPage() {
                     title="Contests Management"
                     description="Organize programming contests with real-time leaderboards and automated judging"
                     icon={<Trophy className="h-6 w-6" />}
-                    badgeText="Coming Soon"
+                    badgeText="Active"
                     badgeVariant="default"
                     href="/admin/contests"
                 />

@@ -259,7 +259,7 @@ export default function AddProblemModal({ isOpen, onClose, onSuccess, contestId 
                     )}
 
                     {success && (
-                        <Alert className="border-green-200 bg-green-50 text-green-800">
+                        <Alert className="text-green-800">
                             <AlertCircle className="w-4 h-4" />
                             <AlertDescription>Problem added to contest successfully!</AlertDescription>
                         </Alert>

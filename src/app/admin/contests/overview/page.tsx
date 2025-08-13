@@ -29,7 +29,7 @@ export default function ContestOverview() {
             </div>
 
             {/* Contest Status */}
-            <div className="p-6 border rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50">
+            {/* <div className="p-6 border rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50">
                 <div className="flex items-center gap-3 mb-4">
                     <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                     <h3 className="font-semibold text-lg">Code Clash 2024 - Active</h3>
@@ -48,10 +48,10 @@ export default function ContestOverview() {
                         <span>{stats.participants} participants</span>
                     </div>
                 </div>
-            </div>
+            </div> */}
 
             {/* Statistics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2  gap-6">
                 <div className="p-6 border rounded-lg">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">

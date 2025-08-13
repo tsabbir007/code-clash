@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { contest, contestProblem, contestParticipant, contestModerator, user } from '@/db/schema';
-import { eq, desc, and, count } from 'drizzle-orm';
+import { eq, desc, and, count, ilike, gte, lte, lt, gt } from 'drizzle-orm';
 
 // GET - Fetch all contests
 export async function GET(request: NextRequest) {
@@ -17,18 +17,18 @@ export async function GET(request: NextRequest) {
         // Build where conditions
         let whereConditions = [];
         if (search) {
-            whereConditions.push(contest.title.ilike(`%${search}%`));
+            whereConditions.push(ilike(contest.title, `%${search}%`));
         }
         if (status) {
             if (status === 'active') {
                 whereConditions.push(and(
-                    contest.startTime.lte(new Date()),
-                    contest.endTime.gte(new Date())
+                    lte(contest.startTime, new Date()),
+                    gte(contest.endTime, new Date())
                 ));
             } else if (status === 'upcoming') {
-                whereConditions.push(contest.startTime.gt(new Date()));
+                whereConditions.push(gt(contest.startTime, new Date()));
             } else if (status === 'ended') {
-                whereConditions.push(contest.endTime.lt(new Date()));
+                whereConditions.push(lt(contest.endTime, new Date()));
             }
         }
 

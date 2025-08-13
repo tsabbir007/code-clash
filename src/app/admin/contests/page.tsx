@@ -155,7 +155,7 @@ export default function Contests() {
             </div>
 
             {/* Contests Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {contests.map((contest) => (
                     <div key={contest.id} className="p-6 border rounded-lg hover:border-primary/50 hover:shadow-md transition-all">
                         {/* Contest Header */}
@@ -166,7 +166,7 @@ export default function Contests() {
                                     {contest.description || 'No description available'}
                                 </p>
                             </div>
-                            <Badge className={`${getStatusBadge(contest.status)} flex items-center gap-1`}>
+                            <Badge className={`${getStatusBadge(contest.status)} capitalize flex items-center gap-1`}>
                                 {getStatusIcon(contest.status)}
                                 {contest.status}
                             </Badge>

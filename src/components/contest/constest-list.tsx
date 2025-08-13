@@ -93,7 +93,7 @@ export function ContestList({ contests, myContests, loading, activeTab, onTabCha
                                 {contests.map((contest) => (
                                     <ContestListCard key={contest.id} {...contest} />
                                 ))}
-                                <CustomPagination />
+                                {/* <CustomPagination /> */}
                             </>
                         )}
                     </div>

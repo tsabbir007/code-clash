@@ -19,7 +19,10 @@ const LoginButton = () => {
                     name={session.user?.name || ""}
                     email={session.user?.email || ""}
                     avatar={session.user?.image || ""}
-                    onLogout={() => authClient.signOut()}
+                    onLogout={() => {
+                        authClient.signOut();
+                        window.location.reload();
+                    }}
                 />
             </div>
         )
