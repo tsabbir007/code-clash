@@ -442,7 +442,7 @@ export default function ProblemPage() {
             <div className="flex flex-col min-h-screen">
                 <Navbar />
                 <div className="flex-1 flex justify-center items-center">
-                    <div className="text-center space-y-6">
+                    <div className="flex flex-col items-center justify-center text-center space-y-6">
                         <div className="relative">
                             <div className="w-16 h-16 border-4 border-gray-200 dark:border-gray-700 rounded-full animate-pulse"></div>
                             <div className="absolute inset-0 w-16 h-16 border-4 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
