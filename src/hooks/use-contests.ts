@@ -46,7 +46,7 @@ export function useContests(options: UseContestsOptions = {}) {
         totalPages: 0
     });
 
-    const fetchContests = useCallback(async (params: UseContestsOptions = {}) => {
+    const fetchContests = useCallback(async (params: UseContestsOptions = {}, retryCount = 0) => {
         try {
             setLoading(true);
             setError(null);
@@ -58,8 +58,33 @@ export function useContests(options: UseContestsOptions = {}) {
                 status: params.status || ''
             });
 
-            const response = await fetch(`/api/admin/contests?${searchParams}`);
+            // Try the public contests endpoint first
+            let response = await fetch(`/api/contests?${searchParams}`);
+
+            // If public endpoint fails, try admin endpoint as fallback
+            if (!response.ok && response.status === 404) {
+                console.log('Public endpoint not found, trying admin endpoint...');
+                response = await fetch(`/api/admin/contests?${searchParams}`);
+            }
+
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    throw new Error('Access denied. You may need to log in or have admin privileges.');
+                } else if (response.status === 404) {
+                    throw new Error('Contests API endpoint not found. Please check your configuration.');
+                } else if (response.status >= 500 && retryCount < 2) {
+                    // Retry on server errors
+                    console.log(`Server error, retrying... (attempt ${retryCount + 1})`);
+                    await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
+                    return fetchContests(params, retryCount + 1);
+                } else {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+            }
+
             const apiResponse = await handleApiResponse(response, 'Contests loaded successfully', 'Failed to fetch contests');
+
+            console.log("apiResponse", apiResponse)
 
             if (apiResponse.success) {
                 const data = apiResponse.data as ContestsResponse;
@@ -68,9 +93,10 @@ export function useContests(options: UseContestsOptions = {}) {
                 return data;
             }
 
-            throw new Error('Failed to fetch contests');
+            throw new Error(apiResponse.error || 'Failed to fetch contests');
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+            console.error('Error fetching contests:', err);
             setError(errorMessage);
             throw err;
         } finally {
@@ -216,6 +242,30 @@ export function useContests(options: UseContestsOptions = {}) {
         }
     }, []);
 
+    const testDatabaseConnection = useCallback(async () => {
+        try {
+            const response = await fetch('/api/test-db');
+            const data = await response.json();
+            console.log('Database test result:', data);
+            return data;
+        } catch (error) {
+            console.error('Database test failed:', error);
+            return { success: false, error: 'Failed to test database connection' };
+        }
+    }, []);
+
+    const testEnvironment = useCallback(async () => {
+        try {
+            const response = await fetch('/api/env-test');
+            const data = await response.json();
+            console.log('Environment test result:', data);
+            return data;
+        } catch (error) {
+            console.error('Environment test failed:', error);
+            return { success: false, error: 'Failed to test environment variables' };
+        }
+    }, []);
+
     const refreshContests = useCallback(() => {
         return fetchContests();
     }, [fetchContests]);
@@ -230,7 +280,29 @@ export function useContests(options: UseContestsOptions = {}) {
 
     // Initial fetch
     useEffect(() => {
-        fetchContests(options);
+        const initializeContests = async () => {
+            try {
+                await fetchContests(options);
+            } catch (error) {
+                console.error('Failed to initialize contests:', error);
+                // Set a more user-friendly error message
+                if (error instanceof Error) {
+                    if (error.message.includes('Access denied')) {
+                        setError('You need to log in to view contests. Please sign in to continue.');
+                    } else if (error.message.includes('endpoint not found')) {
+                        setError('Contests service is currently unavailable. Please try again later.');
+                    } else if (error.message.includes('Failed to fetch')) {
+                        setError('Unable to load contests. Please check your connection and try again.');
+                    } else {
+                        setError(error.message);
+                    }
+                } else {
+                    setError('An unexpected error occurred while loading contests.');
+                }
+            }
+        };
+
+        initializeContests();
     }, [fetchContests, options.page, options.limit, options.search, options.status]);
 
     return {
@@ -246,6 +318,8 @@ export function useContests(options: UseContestsOptions = {}) {
         refreshContests,
         setPage,
         setLimit,
-        setError
+        setError,
+        testDatabaseConnection,
+        testEnvironment
     };
 }

@@ -16,6 +16,7 @@ import {
     PaginationNext,
     PaginationPrevious,
 } from "@/components/ui/pagination"
+import Link from "next/link"
 
 interface Contest {
     id: number;
@@ -107,7 +108,9 @@ export function ContestList({ contests, myContests, loading, activeTab, onTabCha
                             <div className="min-h-[200px] md:min-h-[300px] flex w-full flex-col items-center justify-center p-4">
                                 <div className="text-sm md:text-base font-medium text-foreground text-center">🏆 Join CodeClash Contests</div>
                                 <div className="text-xs md:text-sm mt-2 text-muted-foreground text-center px-4">Register or sign in to view your personalized contest information</div>
-                                <Button className="cursor-pointer mt-4 md:mt-6 bg-green-600 hover:bg-green-600/90 text-white text-sm md:text-base px-4 py-2">Register or Sign In</Button>
+                                <Button asChild className="cursor-pointer mt-4 md:mt-6 bg-green-600 hover:bg-green-600/90 text-white text-sm md:text-base px-4 py-2">
+                                    <Link href="/login">Register or Sign In</Link>
+                                </Button>
                             </div>
                         ) : (
                             <>

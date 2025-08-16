@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Plus, Calendar, Users, Trophy, Search, Filter, Edit, Trash2, Eye, Clock, AlertCircle } from "lucide-react";
+import { Plus, Calendar, Users, Trophy, Search, Filter, Edit, Trash2, Eye, Clock, AlertCircle, RefreshCw, Database, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,7 @@ export default function Contests() {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
 
-    const { contests, loading, error, pagination, fetchContests, deleteContest, setPage } = useContests({
+    const { contests, loading, error, pagination, fetchContests, deleteContest, setPage, testDatabaseConnection, testEnvironment } = useContests({
         search: searchQuery,
         status: statusFilter,
         page: 1,
@@ -109,6 +109,69 @@ export default function Contests() {
                     <div className="text-center">
                         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                         <p className="text-muted-foreground">Loading contests...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="space-y-6">
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center max-w-md">
+                        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold mb-2">Failed to Load Contests</h3>
+                        <p className="text-muted-foreground mb-4">{error}</p>
+                        <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                            <Button
+                                onClick={() => fetchContests()}
+                                variant="outline"
+                                className="flex items-center gap-2"
+                            >
+                                <RefreshCw className="w-4 h-4" />
+                                Try Again
+                            </Button>
+                            <Button
+                                onClick={async () => {
+                                    const result = await testDatabaseConnection();
+                                    if (result.success) {
+                                        // If DB is working, try to fetch contests again
+                                        fetchContests();
+                                    } else {
+                                        alert(`Database test failed: ${result.error}`);
+                                    }
+                                }}
+                                variant="secondary"
+                                className="flex items-center gap-2"
+                            >
+                                <Database className="w-4 h-4" />
+                                Test Database
+                            </Button>
+                            <Button
+                                onClick={async () => {
+                                    const result = await testEnvironment();
+                                    if (result.success) {
+                                        alert('Environment variables are configured correctly');
+                                    } else {
+                                        alert(`Environment test failed: ${result.error}\nMissing: ${result.missing?.join(', ')}`);
+                                    }
+                                }}
+                                variant="outline"
+                                className="flex items-center gap-2"
+                            >
+                                <Settings className="w-4 h-4" />
+                                Test Environment
+                            </Button>
+                        </div>
+                        <div className="mt-4 text-xs text-muted-foreground">
+                            <p>If the problem persists, check:</p>
+                            <ul className="list-disc list-inside mt-1 space-y-1">
+                                <li>Database connection</li>
+                                <li>Environment variables</li>
+                                <li>Authentication status</li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
