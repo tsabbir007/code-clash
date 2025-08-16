@@ -1,11 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { OctagonAlertIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,9 +17,10 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { authClient } from "@/lib/auth-client";
+import { showErrorToast, showSuccessToast } from "@/lib/utils";
 import Link from "next/link";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 const formSchema = z.object({
     name: z.string().min(1, { message: "Name is required" }),
@@ -36,7 +35,6 @@ const formSchema = z.object({
 
 const RegisterView = () => {
     const router = useRouter();
-    const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -49,26 +47,58 @@ const RegisterView = () => {
     });
 
     const onSubmit = (data: z.infer<typeof formSchema>) => {
-        setError(null);
         setIsLoading(true);
 
-        authClient.signUp.email(
-            {
-                name: data.name,
-                email: data.email,
-                password: data.password,
-            },
-            {
-                onSuccess: () => {
-                    setIsLoading(false);
-                    router.push("/");
+        try {
+            authClient.signUp.email(
+                {
+                    name: data.name,
+                    email: data.email,
+                    password: data.password,
                 },
-                onError: ({ error }) => {
-                    setIsLoading(false);
-                    setError(error.message);
+                {
+                    onSuccess: () => {
+                        setIsLoading(false);
+                        showSuccessToast("Account created successfully!");
+                        router.push("/");
+                    },
+                    onError: ({ error }) => {
+                        setIsLoading(false);
+
+                        // Debug: Log the error object to understand its structure
+                        console.log('Register error object:', error);
+
+                        // Handle different error object structures
+                        let errorMessage = 'Unknown error occurred';
+
+                        if (typeof error === 'string') {
+                            errorMessage = error;
+                        } else if (error && typeof error === 'object') {
+                            errorMessage = error.message || error.error || error.toString();
+                        } else if (error) {
+                            errorMessage = String(error);
+                        }
+
+                        // Handle different types of errors
+                        if (errorMessage.includes('500') || errorMessage.includes('Internal Server Error')) {
+                            showErrorToast("Server error occurred. Please check your database connection and try again.");
+                        } else if (errorMessage.includes('User already exists')) {
+                            showErrorToast("An account with this email already exists. Please login instead.");
+                        } else if (errorMessage.includes('Invalid email')) {
+                            showErrorToast("Please enter a valid email address.");
+                        } else if (errorMessage.includes('Password too weak')) {
+                            showErrorToast("Password is too weak. Please choose a stronger password.");
+                        } else {
+                            showErrorToast(errorMessage);
+                        }
+                    }
                 }
-            }
-        )
+            )
+        } catch (error) {
+            setIsLoading(false);
+            console.error('Register error caught in try-catch:', error);
+            showErrorToast("An unexpected error occurred. Please try again.");
+        }
     }
 
     return (
@@ -165,19 +195,13 @@ const RegisterView = () => {
                             >
                                 Forgot your password?
                             </Link>
-                            {!!error && (
-                                <Alert className="bg-destructive/10 border-none">
-                                    <OctagonAlertIcon className="h-4 w-4 !text-destructive" />
-                                    <AlertTitle>{error}</AlertTitle>
-                                </Alert>
-                            )}
                             <div className="flex flex-col gap-3">
-                                <Button 
-                                    type="submit" 
+                                <Button
+                                    type="submit"
                                     className="w-full cursor-pointer"
                                     disabled={isLoading}
                                 >
-                                    Register
+                                    {isLoading ? "Creating account..." : "Register"}
                                 </Button>
                                 <Button variant="outline" className="w-full cursor-pointer">
                                     Sign up with Google

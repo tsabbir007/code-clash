@@ -280,7 +280,7 @@ solve();`
             </CardContent>
 
             <CardFooter>
-                <div className="absolute bottom-0 left-0 right-3 p-3">
+                <div className="absolute -bottom-20 md:-bottom-44 lg:bottom-0 left-0 right-7 lg:right-3 p-3">
                     <div className="flex items-center justify-end">
                         {/* <div className="flex items-center gap-2">
                             <Button

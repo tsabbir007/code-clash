@@ -7,8 +7,9 @@ import { Navbar } from "@/components/navbar/navbar"
 import { CodeEditor, ProblemStatement, SubmissionResult, SubmissionHistory } from "@/components/problem"
 import { Button } from "@/components/ui/button"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
-import { Loader, AlertTriangle, Clock } from "lucide-react"
+import { Loader, AlertTriangle, Clock, Copy, Check } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { handleApiResponse, showErrorToast, showSuccessToast } from "@/lib/utils"
 
 interface TestCaseResult {
     id: number;
@@ -18,7 +19,7 @@ interface TestCaseResult {
     expectedOutput: string;
     actualOutput?: string;
     executionTime?: number;
-    memoryUsage?: number;   
+    memoryUsage?: number;
     error?: string;
 }
 
@@ -76,6 +77,8 @@ export default function ProblemPage() {
     const [submissions, setSubmissions] = useState<SubmissionResult[]>([]);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [viewingCode, setViewingCode] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'problem' | 'code'>('problem');
+    const [isCopied, setIsCopied] = useState(false);
 
     const checkAuthStatus = async () => {
         try {
@@ -92,16 +95,14 @@ export default function ProblemPage() {
             console.log('Loading problem with ID:', problemId);
 
             const response = await fetch(`/api/problems/public/${problemId}`)
-            const data = await response.json()
+            const apiResponse = await handleApiResponse(response, 'Problem loaded successfully', 'Failed to load problem')
 
-            if (data.success) {
-                console.log('Problem loaded successfully:', data.problem);
-                console.log('All test cases found:', data.problem.allTestCases);
-                console.log('Number of test cases:', data.problem.allTestCases?.length || 0);
+            if (apiResponse.success) {
+                console.log('Problem loaded successfully:', apiResponse.data.problem);
+                console.log('All test cases found:', apiResponse.data.problem.allTestCases);
+                console.log('Number of test cases:', apiResponse.data.problem.allTestCases?.length || 0);
 
-                setProblem(data.problem)
-            } else {
-                console.error('Failed to load problem:', data.error)
+                setProblem(apiResponse.data.problem)
             }
         } catch (error) {
             console.error('Error loading problem:', error)
@@ -113,11 +114,11 @@ export default function ProblemPage() {
     const loadSubmissions = async () => {
         try {
             const response = await fetch(`/api/submissions?problemId=${problemId}`);
-            const data = await response.json();
+            const apiResponse = await handleApiResponse(response, 'Submissions loaded successfully', 'Failed to load submissions');
 
-            if (data.success) {
+            if (apiResponse.success) {
                 // Transform API submissions to match our interface
-                const transformedSubmissions: SubmissionResult[] = data.submissions.map((sub: any) => ({
+                const transformedSubmissions: SubmissionResult[] = apiResponse.data.submissions.map((sub: any) => ({
                     id: sub.id.toString(),
                     timestamp: new Date(sub.createdAt),
                     language: sub.language,
@@ -153,12 +154,13 @@ export default function ProblemPage() {
             }
         } catch (error) {
             console.error('Error loading submissions:', error);
+            showErrorToast('Failed to load submissions');
         }
     };
 
     const handleSubmit = async () => {
         if (!code.trim()) {
-            alert('Please enter your code');
+            showErrorToast('Please enter your code');
             return;
         }
 
@@ -182,18 +184,17 @@ export default function ProblemPage() {
                 })
             });
 
-            if (!response.ok) {
+            const apiResponse = await handleApiResponse(response, 'Solution submitted successfully!', 'Failed to submit solution');
+
+            if (!apiResponse.success) {
                 if (response.status === 401) {
-                    alert('Please log in to submit code.');
-                    return;
-                } else {
-                    const errorData = await response.json().catch(() => ({}));
-                    alert(`Submission failed: ${errorData.error || 'Unknown error'}`);
+                    showErrorToast('Please log in to submit code');
                     return;
                 }
+                return;
             }
 
-            const data = await response.json();
+            const data = apiResponse.data;
 
             if (data.success) {
                 // Create a solution record for execution
@@ -210,11 +211,13 @@ export default function ProblemPage() {
                     })
                 });
 
-                if (!solutionResponse.ok) {
+                const solutionApiResponse = await handleApiResponse(solutionResponse, 'Solution created for execution', 'Failed to create solution for execution');
+
+                if (!solutionApiResponse.success) {
                     throw new Error('Failed to create solution for execution');
                 }
 
-                const solutionData = await solutionResponse.json();
+                const solutionData = solutionApiResponse.data;
                 const solutionId = solutionData.solution.id;
 
                 // Create test case results from the problem's all test cases
@@ -268,11 +271,13 @@ export default function ProblemPage() {
                         }
                     });
 
-                    if (!executionResponse.ok) {
+                    const executionApiResponse = await handleApiResponse(executionResponse, 'Solution executed successfully', 'Execution failed');
+
+                    if (!executionApiResponse.success) {
                         throw new Error(`Execution failed: ${executionResponse.statusText}`);
                     }
 
-                    const executionData = await executionResponse.json();
+                    const executionData = executionApiResponse.data;
 
                     if (executionData.success) {
                         // Transform the execution results to match our interface
@@ -373,14 +378,14 @@ export default function ProblemPage() {
                     setIsExecuting(false);
                 }
             } else {
-                alert(`Submission failed: ${data.error}`);
+                showErrorToast(`Submission failed: ${data.error}`);
             }
         } catch (error) {
             console.error('Error submitting code:', error);
             if (error instanceof Error && error.message.includes('Unauthorized')) {
-                alert('Please log in to submit code.');
+                showErrorToast('Please log in to submit code.');
             } else {
-                alert('Failed to submit code. Please try again.');
+                showErrorToast('Failed to submit code. Please try again.');
             }
         } finally {
             setIsSubmitting(false);
@@ -400,6 +405,18 @@ export default function ProblemPage() {
                 element.scrollIntoView({ behavior: 'smooth' });
             }
         }, 100);
+    };
+
+    const handleCopyCode = async () => {
+        if (viewingCode) {
+            try {
+                await navigator.clipboard.writeText(viewingCode);
+                setIsCopied(true);
+                setTimeout(() => setIsCopied(false), 3000);
+            } catch (err) {
+                console.error('Failed to copy code:', err);
+            }
+        }
     };
 
     useEffect(() => {
@@ -441,15 +458,15 @@ export default function ProblemPage() {
         return (
             <div className="flex flex-col min-h-screen">
                 <Navbar />
-                <div className="flex-1 flex justify-center items-center">
-                    <div className="flex flex-col items-center justify-center text-center space-y-6">
+                <div className="flex-1 flex justify-center items-center px-4">
+                    <div className="flex flex-col items-center justify-center text-center space-y-4 md:space-y-6">
                         <div className="relative">
-                            <div className="w-16 h-16 border-4 border-gray-200 dark:border-gray-700 rounded-full animate-pulse"></div>
-                            <div className="absolute inset-0 w-16 h-16 border-4 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-12 h-12 md:w-16 md:h-16 border-4 border-gray-200 dark:border-gray-700 rounded-full animate-pulse"></div>
+                            <div className="absolute inset-0 w-12 h-12 md:w-16 md:h-16 border-4 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
                         </div>
                         <div className="space-y-2">
-                            <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300">Loading Problem</h2>
-                            <p className="text-gray-500 dark:text-gray-400">Preparing your coding environment...</p>
+                            <h2 className="text-lg md:text-xl font-semibold text-gray-700 dark:text-gray-300">Loading Problem</h2>
+                            <p className="text-sm md:text-base text-gray-500 dark:text-gray-400">Preparing your coding environment...</p>
                         </div>
                     </div>
                 </div>
@@ -461,20 +478,20 @@ export default function ProblemPage() {
         return (
             <div className="flex flex-col min-h-screen">
                 <Navbar />
-                <div className="flex-1 flex justify-center items-center">
-                    <div className="text-center space-y-6 max-w-md mx-auto px-6">
-                        <div className="w-20 h-20 mx-auto bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
-                            <AlertTriangle className="w-10 h-10 text-red-500" />
+                <div className="flex-1 flex justify-center items-center px-4">
+                    <div className="text-center space-y-4 md:space-y-6 max-w-md mx-auto">
+                        <div className="w-16 h-16 md:w-20 md:h-20 mx-auto bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
+                            <AlertTriangle className="w-8 h-8 md:w-10 md:h-10 text-red-500" />
                         </div>
-                        <div className="space-y-3">
-                            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Problem Not Found</h1>
-                            <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                        <div className="space-y-2 md:space-y-3">
+                            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">Problem Not Found</h1>
+                            <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 leading-relaxed">
                                 The problem you're looking for doesn't exist or may have been removed.
                             </p>
                         </div>
                         <Link
                             href="/problems"
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition-all duration-200 hover:shadow-lg hover:scale-105"
+                            className="inline-flex items-center gap-2 px-4 md:px-6 py-2 md:py-3 bg-gray-600 hover:bg-gray-700 text-white text-sm md:text-base font-medium rounded-lg transition-all duration-200 hover:shadow-lg hover:scale-105"
                         >
                             Browse Problems
                         </Link>
@@ -488,37 +505,37 @@ export default function ProblemPage() {
         <div className="flex flex-col min-h-screen">
             <Navbar />
 
-            <div className="flex-1 mx-auto w-full">
+            <div className="flex-1 mx-auto w-full px-4 md:px-6">
                 {/* Page Header */}
-                <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/50 dark:via-indigo-950/50 dark:to-purple-950/50 border border-blue-200/60 dark:border-blue-800/40 rounded-2xl shadow-lg">
-                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                        <div className="space-y-4">
-                            <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
+                <div className="mb-6 md:mb-8 p-4 md:p-6 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/50 dark:via-indigo-950/50 dark:to-purple-950/50 border border-blue-200/60 dark:border-blue-800/40 rounded-xl md:rounded-2xl shadow-lg">
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 md:gap-6">
+                        <div className="space-y-3 md:space-y-4">
+                            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
                                 {problem.title}
                             </h1>
-                            <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600 dark:text-gray-300">
-                                <span className="flex items-center gap-3 px-4 py-2 bg-white/80 dark:bg-gray-800/80 rounded-lg border border-blue-200/60 dark:border-blue-700/40 shadow-sm">
-                                    <div className={`w-3 h-3 rounded-full ${problem.difficulty === 'Easy' ? 'bg-green-500' :
+                            <div className="flex flex-wrap items-center gap-3 md:gap-6 text-xs md:text-sm text-gray-600 dark:text-gray-300">
+                                <span className="flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2 bg-white/80 dark:bg-gray-800/80 rounded-lg border border-blue-200/60 dark:border-blue-700/40 shadow-sm">
+                                    <div className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${problem.difficulty === 'Easy' ? 'bg-green-500' :
                                         problem.difficulty === 'Medium' ? 'bg-yellow-500' :
                                             'bg-red-500'
                                         }`}></div>
                                     <span className="font-medium">{problem.difficulty}</span>
                                 </span>
-                                <span className="flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 rounded-lg border border-blue-200/60 dark:border-blue-700/40 shadow-sm">
-                                    <Clock className="w-4 h-4" />
+                                <span className="flex items-center gap-2 px-3 md:px-4 py-2 bg-white/80 dark:bg-gray-800/80 rounded-lg border border-blue-200/60 dark:border-blue-700/40 shadow-sm">
+                                    <Clock className="w-3 h-3 md:w-4 md:h-4" />
                                     <span className="font-medium">{problem.timeLimit}ms</span>
                                 </span>
-                                <span className="flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 rounded-lg border border-blue-200/60 dark:border-blue-700/40 shadow-sm">
-                                    <div className="w-4 h-4 bg-purple-500 rounded-full"></div>
+                                <span className="flex items-center gap-2 px-3 md:px-4 py-2 bg-white/80 dark:bg-gray-800/80 rounded-lg border border-blue-200/60 dark:border-blue-700/40 shadow-sm">
+                                    <div className="w-3 h-3 md:w-4 md:h-4 bg-purple-500 rounded-full"></div>
                                     <span className="font-medium">{problem.memoryLimit}MB</span>
                                 </span>
                             </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-2 md:gap-3">
                             {problem.categories.map((category) => (
                                 <span
                                     key={category.id}
-                                    className="px-4 py-2 bg-white/80 dark:bg-gray-800/80 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-lg border border-blue-200/60 dark:border-blue-700/40 hover:bg-white dark:hover:bg-gray-700 transition-all duration-200 shadow-sm hover:shadow-md"
+                                    className="px-3 md:px-4 py-2 bg-white/80 dark:bg-gray-800/80 text-gray-700 dark:text-gray-200 text-xs md:text-sm font-medium rounded-lg border border-blue-200/60 dark:border-blue-700/40 hover:bg-white dark:hover:bg-gray-700 transition-all duration-200 shadow-sm hover:shadow-md"
                                 >
                                     {category.name}
                                 </span>
@@ -527,14 +544,84 @@ export default function ProblemPage() {
                     </div>
                 </div>
 
+                {/* Mobile Tab Navigation */}
+                <div className="lg:hidden mb-4">
+                    <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                        <button
+                            onClick={() => setActiveTab('problem')}
+                            className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-all ${activeTab === 'problem'
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                                }`}
+                        >
+                            Problem
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('code')}
+                            className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-all ${activeTab === 'code'
+                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                                }`}
+                        >
+                            Code Editor
+                        </button>
+                    </div>
+                </div>
+
                 {/* Main Layout */}
-                <div className="h-[calc(100vh-120px)] sm:h-[calc(100vh-100px)] border border-gray-200/60 dark:border-gray-700/60 rounded-2xl bg-white dark:bg-gray-900 shadow-xl overflow-hidden">
-                    <ResizablePanelGroup direction="horizontal" className="h-full">
-                        {/* Left Panel: Problem Statement */}
-                        <ResizablePanel defaultSize={50} minSize={35} className="relative">
+                <div className="h-[calc(100vh-200px)] md:h-[calc(100vh-150px)] lg:h-[calc(100vh-120px)] border border-gray-200/60 dark:border-gray-700/60 rounded-xl md:rounded-2xl bg-white dark:bg-gray-900 shadow-xl overflow-hidden">
+                    {/* Desktop Layout */}
+                    <div className="hidden lg:block h-full">
+                        <ResizablePanelGroup direction="horizontal" className="h-full">
+                            {/* Left Panel: Problem Statement */}
+                            <ResizablePanel defaultSize={50} minSize={35} className="relative">
+                                <div className="h-full flex flex-col">
+                                    <div className="flex-shrink-0 p-4 md:p-6 border-b border-gray-200/60 dark:border-gray-700/60 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900/50">
+                                        <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-gray-100">Problem Statement</h2>
+                                    </div>
+                                    <div className="flex-1 overflow-hidden">
+                                        <ProblemStatement
+                                            title={problem.title}
+                                            statement={problem.statement}
+                                            difficulty={problem.difficulty}
+                                            timeLimit={problem.timeLimit}
+                                            memoryLimit={problem.memoryLimit}
+                                            categories={problem.categories}
+                                            testCases={problem.allTestCases}
+                                        />
+                                    </div>
+                                </div>
+                            </ResizablePanel>
+
+                            <ResizableHandle withHandle className="bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors duration-200 w-1" />
+
+                            {/* Right Panel: Code Editor */}
+                            <ResizablePanel defaultSize={50} minSize={35} className="relative">
+                                <div className="h-full flex flex-col">
+                                    <div className="flex-1 overflow-hidden">
+                                        <CodeEditor
+                                            code={code}
+                                            onCodeChange={setCode}
+                                            language={language}
+                                            onLanguageChange={setLanguage}
+                                            onSubmit={handleSubmit}
+                                            isSubmitting={isSubmitting || isExecuting}
+                                            isAuthenticated={isAuthenticated}
+                                            onLoginClick={() => window.location.href = '/login'}
+                                            onRegisterClick={() => window.location.href = '/register'}
+                                        />
+                                    </div>
+                                </div>
+                            </ResizablePanel>
+                        </ResizablePanelGroup>
+                    </div>
+
+                    {/* Mobile Layout */}
+                    <div className="lg:hidden h-full">
+                        {activeTab === 'problem' ? (
                             <div className="h-full flex flex-col">
-                                <div className="flex-shrink-0 p-6 border-b border-gray-200/60 dark:border-gray-700/60 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900/50">
-                                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Problem Statement</h2>
+                                <div className="flex-shrink-0 p-4 border-b border-gray-200/60 dark:border-gray-700/60 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900/50">
+                                    <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Problem Statement</h2>
                                 </div>
                                 <div className="flex-1 overflow-hidden">
                                     <ProblemStatement
@@ -548,14 +635,8 @@ export default function ProblemPage() {
                                     />
                                 </div>
                             </div>
-                        </ResizablePanel>
-
-                        <ResizableHandle withHandle className="bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors duration-200 w-1" />
-
-                        {/* Right Panel: Code Editor */}
-                        <ResizablePanel defaultSize={50} minSize={35} className="relative">
+                        ) : (
                             <div className="h-full flex flex-col">
-                                
                                 <div className="flex-1 overflow-hidden">
                                     <CodeEditor
                                         code={code}
@@ -570,16 +651,16 @@ export default function ProblemPage() {
                                     />
                                 </div>
                             </div>
-                        </ResizablePanel>
-                    </ResizablePanelGroup>
+                        )}
+                    </div>
                 </div>
 
                 {/* Submission Result */}
                 {submissionResult && (
-                    <div id="submission-result" className="mt-10 animate-in slide-in-from-bottom-4 duration-500">
-                        <div className="mb-4">
-                            <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Latest Submission</h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Results from your most recent code execution</p>
+                    <div id="submission-result" className="mt-6 md:mt-10 animate-in slide-in-from-bottom-4 duration-500">
+                        <div className="mb-3 md:mb-4">
+                            <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">Latest Submission</h3>
+                            <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">Results from your most recent code execution</p>
                         </div>
                         <SubmissionResult
                             submission={submissionResult}
@@ -589,10 +670,10 @@ export default function ProblemPage() {
                 )}
 
                 {/* Submission History */}
-                <div className="mt-10">
-                    <div className="mb-4">
-                        <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Submission History</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Track your previous attempts and improvements</p>
+                <div className="mt-6 md:mt-10">
+                    <div className="mb-3 md:mb-4">
+                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">Submission History</h3>
+                        <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">Track your previous attempts and improvements</p>
                     </div>
                     <SubmissionHistory
                         submissions={submissions}
@@ -604,26 +685,47 @@ export default function ProblemPage() {
 
             {/* Code Viewer Modal */}
             {viewingCode && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-6">
-                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden border border-gray-200/60 dark:border-gray-700/60">
-                        <div className="flex items-center justify-between p-6 border-b border-gray-200/60 dark:border-gray-700/60 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900/50">
-                            <div className="flex items-center gap-3">
-                                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Submitted Code</h3>
-                                <Badge variant="secondary" className="ml-2">
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 md:p-6">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl md:rounded-2xl shadow-2xl max-w-4xl md:max-w-6xl w-full max-h-[90vh] overflow-hidden border border-gray-200/60 dark:border-gray-700/60">
+                        <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200/60 dark:border-gray-700/60 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900/50">
+                            <div className="flex items-center gap-2 md:gap-3">
+                                <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">Submitted Code</h3>
+                                <Badge variant="secondary" className="ml-2 text-xs">
                                     {language.toUpperCase()}
                                 </Badge>
                             </div>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setViewingCode(null)}
-                                className="h-10 w-10 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200 hover:scale-105"
-                            >
-                                <span className="text-xl">×</span>
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleCopyCode}
+                                    disabled={isCopied}
+                                    className="h-8 md:h-9 px-3 text-xs md:text-sm bg-white/80 dark:bg-gray-800/80 hover:bg-white dark:hover:bg-gray-700 border-blue-200/60 dark:border-blue-700/40 transition-all duration-200"
+                                >
+                                    {isCopied ? (
+                                        <>
+                                            <Check className="w-3 h-3 md:w-4 md:h-4 mr-1 text-green-600" />
+                                            Copied!
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Copy className="w-3 h-3 md:w-4 md:h-4 mr-1" />
+                                            Copy Code
+                                        </>
+                                    )}
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setViewingCode(null)}
+                                    className="h-8 w-8 md:h-10 md:w-10 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200 hover:scale-105"
+                                >
+                                    <span className="text-lg md:text-xl">×</span>
+                                </Button>
+                            </div>
                         </div>
-                        <div className="p-6 overflow-auto max-h-[calc(90vh-120px)]">
-                            <pre className="bg-gray-50 dark:bg-gray-800 p-6 rounded-xl text-sm overflow-x-auto whitespace-pre-wrap border border-gray-200/60 dark:border-gray-700/60 font-mono leading-relaxed text-gray-900 dark:text-gray-100">
+                        <div className="p-4 md:p-6 overflow-auto max-h-[calc(90vh-120px)]">
+                            <pre className="bg-gray-50 dark:bg-gray-800 p-4 md:p-6 rounded-xl text-xs md:text-sm overflow-x-auto whitespace-pre-wrap border border-gray-200/60 dark:border-gray-700/60 font-mono leading-relaxed text-gray-900 dark:text-gray-100">
                                 {viewingCode}
                             </pre>
                         </div>

@@ -1,3 +1,5 @@
+"use client";
+
 import { NavUser } from "@/components/navbar/nav-user";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";

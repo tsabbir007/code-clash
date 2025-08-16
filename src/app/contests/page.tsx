@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { handleApiResponse, showErrorToast, showSuccessToast } from '@/lib/utils';
 import {
     Calendar,
     Clock,
@@ -50,20 +51,17 @@ export default function ContestsPage() {
             setError(null);
 
             const response = await fetch('/api/contests');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            const apiResponse = await handleApiResponse(response, 'Contests loaded successfully', 'Failed to fetch contests');
 
-            const result = await response.json();
-
-            if (result.success) {
-                setContests(result.data);
+            if (apiResponse.success) {
+                setContests(apiResponse.data || []);
             } else {
-                throw new Error(result.error || 'Failed to fetch contests');
+                setContests([]);
             }
         } catch (error) {
             console.error('Error fetching contests:', error);
-            setError(error instanceof Error ? error.message : 'Failed to fetch contests');
+            setError('Failed to fetch contests');
+            setContests([]);
         } finally {
             setLoading(false);
         }
@@ -77,22 +75,15 @@ export default function ContestsPage() {
                 method: 'POST',
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            const apiResponse = await handleApiResponse(response, 'Successfully registered for the contest!', 'Failed to register for contest');
 
-            const result = await response.json();
-
-            if (result.success) {
+            if (apiResponse.success) {
                 // Refresh contests to update participant count
                 await fetchContests();
-                alert('Successfully registered for the contest!');
-            } else {
-                throw new Error(result.error || 'Failed to register for contest');
             }
         } catch (error) {
             console.error('Error registering for contest:', error);
-            alert(error instanceof Error ? error.message : 'Failed to register for contest');
+            showErrorToast('Failed to register for contest');
         } finally {
             setRegisteringContest(null);
         }
@@ -129,7 +120,7 @@ export default function ContestsPage() {
         return `${minutes}m`;
     };
 
-    const filteredContests = contests.filter(contest => {
+    const filteredContests = (contests || []).filter((contest: Contest) => {
         const matchesSearch = contest.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
             contest.description.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -215,7 +206,7 @@ export default function ContestsPage() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredContests.map((contest) => {
+                    {filteredContests.map((contest: Contest) => {
                         const status = getContestStatus(contest.startTime, contest.endTime);
                         const isActive = status.status === 'active';
                         const isUpcoming = status.status === 'upcoming';

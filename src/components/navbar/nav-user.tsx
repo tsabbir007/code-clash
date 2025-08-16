@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { Button } from "../ui/button";
-import { auth } from "@/lib/auth";
 import { authClient } from "@/lib/auth-client";
 
 interface NavUserProps {

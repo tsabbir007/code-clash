@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { handleApiResponse, showErrorToast, showSuccessToast } from '@/lib/utils';
 import {
     Clock,
     Users,
@@ -17,7 +18,8 @@ import {
     Ruler,
     Award,
     Play,
-    UserPlus
+    UserPlus,
+    Medal
 } from 'lucide-react';
 
 interface ContestProblem {
@@ -40,6 +42,42 @@ interface ContestData {
     problems: ContestProblem[];
     participants: number;
     totalPoints: number;
+    standings: Array<{
+        rank: number;
+        userName: string;
+        totalScore: number;
+        problemsSolved: number;
+        penalty: number;
+        lastSubmissionTime: string;
+        problemResults: Array<{
+            problemId: number;
+            problemTitle: string;
+            score: number;
+            attempts: number;
+            isSolved: boolean;
+            firstSolveTime?: string;
+        }>;
+    }>;
+}
+
+interface StandingsData {
+    problems: ContestProblem[];
+    standings: Array<{
+        rank: number;
+        userName: string;
+        totalScore: number;
+        problemsSolved: number;
+        penalty: number;
+        lastSubmissionTime: string;
+        problemResults: Array<{
+            problemId: number;
+            problemTitle: string;
+            score: number;
+            attempts: number;
+            isSolved: boolean;
+            firstSolveTime?: string;
+        }>;
+    }>;
 }
 
 export default function ContestInfoPage() {
@@ -47,7 +85,9 @@ export default function ContestInfoPage() {
     const contestId = params.contestId as string;
 
     const [contestData, setContestData] = useState<ContestData | null>(null);
+    const [standingsData, setStandingsData] = useState<StandingsData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [standingsLoading, setStandingsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [registering, setRegistering] = useState(false);
 
@@ -63,20 +103,14 @@ export default function ContestInfoPage() {
             setError(null);
 
             const response = await fetch(`/api/contests/${contestId}/info`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            const apiResponse = await handleApiResponse(response, 'Contest info loaded successfully', 'Failed to fetch contest info');
 
-            const result = await response.json();
-
-            if (result.success) {
-                setContestData(result.data);
-            } else {
-                throw new Error(result.error || 'Failed to fetch contest info');
+            if (apiResponse.success) {
+                setContestData(apiResponse.data);
             }
         } catch (error) {
             console.error('Error fetching contest info:', error);
-            setError(error instanceof Error ? error.message : 'Failed to fetch contest info');
+            setError('Failed to fetch contest info');
         } finally {
             setLoading(false);
         }
@@ -90,23 +124,33 @@ export default function ContestInfoPage() {
                 method: 'POST',
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            const apiResponse = await handleApiResponse(response, 'Successfully registered for the contest!', 'Failed to register for contest');
 
-            const result = await response.json();
-
-            if (result.success) {
-                alert('Successfully registered for the contest!');
+            if (apiResponse.success) {
                 await fetchContestInfo(); // Refresh to update participant count
-            } else {
-                throw new Error(result.error || 'Failed to register for contest');
             }
         } catch (error) {
             console.error('Error registering for contest:', error);
-            alert(error instanceof Error ? error.message : 'Failed to register for contest');
+            showErrorToast('Failed to register for contest');
         } finally {
             setRegistering(false);
+        }
+    };
+
+    const fetchStandings = async () => {
+        try {
+            setStandingsLoading(true);
+            const response = await fetch(`/api/contests/${contestId}/standings`);
+            const apiResponse = await handleApiResponse(response, 'Standings loaded successfully', 'Failed to fetch standings');
+
+            if (apiResponse.success) {
+                setStandingsData(apiResponse.data);
+            }
+        } catch (error) {
+            console.error('Error fetching standings:', error);
+            showErrorToast('Failed to fetch standings');
+        } finally {
+            setStandingsLoading(false);
         }
     };
 
@@ -267,9 +311,10 @@ export default function ContestInfoPage() {
 
             {/* Main Content Tabs */}
             <Tabs defaultValue="overview" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-5">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="problems">Problems</TabsTrigger>
+                    <TabsTrigger value="standings">Standings</TabsTrigger>
                     <TabsTrigger value="rules">Rules</TabsTrigger>
                     <TabsTrigger value="prizes">Prizes</TabsTrigger>
                 </TabsList>
@@ -363,6 +408,92 @@ export default function ContestInfoPage() {
                                             <Badge variant="secondary">{problem.points} pts</Badge>
                                         </div>
                                     ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* Standings Tab */}
+                <TabsContent value="standings" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Trophy className="w-5 h-5" />
+                                Contest Standings
+                            </CardTitle>
+                            <CardDescription>
+                                Current rankings based on score and penalty time
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {contestData.standings && contestData.standings.length > 0 ? (
+                                <div className="space-y-4">
+                                    {/* Problems Header */}
+                                    <div className="grid grid-cols-6 gap-2 text-sm font-medium text-muted-foreground border-b pb-2">
+                                        <div className="col-span-2">Participant</div>
+                                        <div className="text-center">Score</div>
+                                        <div className="text-center">Solved</div>
+                                        <div className="text-center">Penalty</div>
+                                        <div className="text-center">Problems</div>
+                                    </div>
+
+                                    {/* Standings Table */}
+                                    <div className="space-y-2">
+                                        {contestData.standings.map((participant) => (
+                                            <div key={participant.userName} className="grid grid-cols-6 gap-2 items-center p-3 border rounded-lg hover:bg-muted/50">
+                                                <div className="col-span-2 flex items-center gap-3">
+                                                    <div className="flex items-center justify-center w-8 h-8">
+                                                        {participant.rank === 1 && <Trophy className="w-6 h-6 text-yellow-500" />}
+                                                        {participant.rank === 2 && <Medal className="w-6 h-6 text-gray-400" />}
+                                                        {participant.rank === 3 && <Medal className="w-6 h-6 text-amber-600" />}
+                                                        {participant.rank > 3 && <span className="text-sm font-medium">{participant.rank}</span>}
+                                                    </div>
+                                                    <span className="font-medium">{participant.userName}</span>
+                                                </div>
+                                                <div className="text-center font-semibold">{participant.totalScore}</div>
+                                                <div className="text-center">{participant.problemsSolved}</div>
+                                                <div className="text-center text-sm">{participant.penalty}</div>
+                                                <div className="flex gap-1 justify-center">
+                                                    {contestData.problems.map((problem) => {
+                                                        const problemResult = participant.problemResults.find(p => p.problemId === problem.problemId);
+                                                        if (!problemResult) {
+                                                            return (
+                                                                <div key={problem.problemId} className="w-6 h-6 border rounded text-xs flex items-center justify-center text-muted-foreground">
+                                                                    -
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        if (problemResult.isSolved) {
+                                                            return (
+                                                                <div key={problem.problemId} className="w-6 h-6 bg-green-100 text-green-800 rounded text-xs flex items-center justify-center font-medium">
+                                                                    ✓
+                                                                </div>
+                                                            );
+                                                        } else if (problemResult.attempts > 0) {
+                                                            return (
+                                                                <div key={problem.problemId} className="w-6 h-6 bg-red-100 text-red-800 rounded text-xs flex items-center justify-center font-medium">
+                                                                    {problemResult.attempts}
+                                                                </div>
+                                                            );
+                                                        } else {
+                                                            return (
+                                                                <div key={problem.problemId} className="w-6 h-6 border rounded text-xs flex items-center justify-center text-muted-foreground">
+                                                                    -
+                                                                </div>
+                                                            );
+                                                        }
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-muted-foreground">
+                                    <Trophy className="w-8 h-8 mx-auto mb-2" />
+                                    <p>No participants yet.</p>
                                 </div>
                             )}
                         </CardContent>

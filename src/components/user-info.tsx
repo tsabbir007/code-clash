@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { showErrorToast, showSuccessToast } from "@/lib/utils";
 
 export default function UserInfo() {
   const [name, setName] = useState("")
@@ -11,7 +12,7 @@ export default function UserInfo() {
   const [password, setPassword] = useState("")
 
   const { data: session } = authClient.useSession()
-  
+
   console.log(session)
 
   const onSignIn = async () => {
@@ -29,10 +30,10 @@ export default function UserInfo() {
       name
     }, {
       onError: () => {
-        window.alert("Something went wrong")
+        showErrorToast("Something went wrong")
       },
       onSuccess: () => {
-        window.alert("Signed up successfully")
+        showSuccessToast("Signed up successfully")
       }
     })
   }
@@ -44,7 +45,7 @@ export default function UserInfo() {
         <p>IP Address: {session.session.ipAddress}</p>
         <p>User Agent: {session.session.userAgent}</p>
         <p>Token: {session.session.token}</p>
-       
+
         <Button className="cursor-pointer" onClick={() => authClient.signOut()}>Sign Out</Button>
       </div>
     )

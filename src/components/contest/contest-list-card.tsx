@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Calendar, Users, Trophy } from "lucide-react"
+import { Calendar, Users, Trophy, LockIcon } from "lucide-react"
+import Image from "next/image"
 
 interface ContestListCardProps {
     id: number;
@@ -23,6 +24,16 @@ export function ContestListCard({ id, title, description, startTime, endTime, is
         });
     };
 
+    const formatDateMobile = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
     const isContestActive = () => {
         const now = new Date();
         const start = new Date(startTime);
@@ -38,45 +49,65 @@ export function ContestListCard({ id, title, description, startTime, endTime, is
 
     const getStatusBadge = () => {
         if (isContestActive()) {
-            return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Active</span>;
+            return <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded-full">Active</span>;
         } else if (isContestUpcoming()) {
-            return <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">Upcoming</span>;
+            return <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded-full">Upcoming</span>;
         } else {
-            return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full">Ended</span>;
+            return <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-800 rounded-full">Ended</span>;
         }
     };
 
     return (
-        <div className="flex flex-row gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-            <div className="flex flex-col justify-center items-center w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg text-white">
-                <Trophy className="w-8 h-8" />
+        <div className="flex flex-col sm:flex-row gap-3 md:gap-4 p-3 md:p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+            <div className="flex justify-center sm:justify-start">
+                <Image
+                    className="w-full h-auto md:h-18 md:w-28 rounded"
+                    src={`/contest/contest-card-${id % 3 + 1}.png`}
+                    alt="contest"
+                    width={200}
+                    height={100}
+                />
             </div>
-            <div className="flex flex-row justify-between items-center w-full">
-                <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-                        {getStatusBadge()}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center w-full gap-3 sm:gap-0">
+                <div className="flex flex-col gap-2 w-full sm:w-auto">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <h3 className="text-base md:text-lg font-semibold text-foreground text-center sm:text-left">{title}</h3>
+                        <div className="flex justify-center sm:justify-start">
+                            {getStatusBadge()}
+                        </div>
                     </div>
-                    <p className="text-sm text-muted-foreground max-w-md">{description}</p>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <div className="flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-4 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
-                            <span>Start: {formatDate(startTime)}</span>
+                            <span className="hidden md:inline">Start: {formatDate(startTime)}</span>
+                            <span className="md:hidden">Start: {formatDateMobile(startTime)}</span>
                         </div>
                         <div className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
-                            <span>End: {formatDate(endTime)}</span>
+                            <span className="hidden md:inline">End: {formatDate(endTime)}</span>
+                            <span className="md:hidden">End: {formatDateMobile(endTime)}</span>
                         </div>
                     </div>
                 </div>
-                <div className="flex flex-col gap-2">
-                    {isRegistered ? (
-                        <Button asChild className="bg-green-600 hover:bg-green-700">
-                            <Link href={`/contests/${id}`}>Enter Contest</Link>
+
+                <div className="w-full sm:w-auto flex justify-center sm:justify-end">
+                    {isContestActive() ? (
+                        <Button asChild className="h-8 md:h-7 rounded-sm text-xs w-full sm:w-auto">
+                            {isRegistered ? (
+                                <Link className="text-purple-500" href={`/contests/${id}`}>Enter</Link>
+                            ) : (
+                                <Link className="!text-muted-foreground" href={`/contests/${id}`}>
+                                    <LockIcon className="size-3" /> Register
+                                </Link>
+                            )}
+                        </Button>
+                    ) : isContestUpcoming() ? (
+                        <Button asChild className="h-8 md:h-7 rounded-sm text-xs w-full sm:w-auto">
+                            <Link className="text-purple-500" href={`/contests/${id}`}>Register</Link>
                         </Button>
                     ) : (
-                        <Button asChild className="bg-blue-600 hover:bg-blue-700">
-                            <Link href={`/contests/${id}`}>View Contest</Link>
+                        <Button asChild className="h-8 md:h-7 rounded-sm text-xs w-full sm:w-auto">
+                            <Link className="text-purple-500" href={`/contests/${id}/info`}>View</Link>
                         </Button>
                     )}
                 </div>

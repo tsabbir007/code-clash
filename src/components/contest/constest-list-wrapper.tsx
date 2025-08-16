@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ContestList } from "./constest-list";
 
-interface Contest {
+export interface Contest {
   id: number;
   title: string;
   description: string;

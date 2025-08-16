@@ -1,11 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { OctagonAlertIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,9 +18,10 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { authClient } from "@/lib/auth-client";
+import { showErrorToast, showSuccessToast } from "@/lib/utils";
 import Link from "next/link";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 const formSchema = z.object({
     email: z.string().email(),
@@ -33,7 +32,6 @@ const formSchema = z.object({
 
 const LoginView = () => {
     const router = useRouter();
-    const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -45,25 +43,55 @@ const LoginView = () => {
     });
 
     const onSubmit = (data: z.infer<typeof formSchema>) => {
-        setError(null);
         setIsLoading(true);
 
-        authClient.signIn.email(
-            {
-                email: data.email,
-                password: data.password,
-            },
-            {
-                onSuccess: () => {
-                    setIsLoading(false);
-                    router.push("/");
+        try {
+            authClient.signIn.email(
+                {
+                    email: data.email,
+                    password: data.password,
                 },
-                onError: ({ error }) => {
-                    setIsLoading(false);
-                    setError(error.message);
+                {
+                    onSuccess: () => {
+                        setIsLoading(false);
+                        showSuccessToast("Successfully logged in!");
+                        router.push("/");
+                    },
+                    onError: ({ error }) => {
+                        setIsLoading(false);
+
+                        // Debug: Log the error object to understand its structure
+                        console.log('Login error object:', error);
+
+                        // Handle different error object structures
+                        let errorMessage = 'Unknown error occurred';
+
+                        if (typeof error === 'string') {
+                            errorMessage = error;
+                        } else if (error && typeof error === 'object') {
+                            errorMessage = error.message || error.error || error.toString();
+                        } else if (error) {
+                            errorMessage = String(error);
+                        }
+
+                        // Handle different types of errors
+                        if (errorMessage.includes('500') || errorMessage.includes('Internal Server Error')) {
+                            showErrorToast("Server error occurred. Please check your database connection and try again.");
+                        } else if (errorMessage.includes('Invalid credentials')) {
+                            showErrorToast("Invalid email or password. Please try again.");
+                        } else if (errorMessage.includes('User not found')) {
+                            showErrorToast("No account found with this email. Please register first.");
+                        } else {
+                            showErrorToast(errorMessage);
+                        }
+                    }
                 }
-            }
-        )
+            )
+        } catch (error) {
+            setIsLoading(false);
+            console.error('Login error caught in try-catch:', error);
+            showErrorToast("An unexpected error occurred. Please try again.");
+        }
     }
 
     return (
@@ -123,12 +151,6 @@ const LoginView = () => {
                             >
                                 Forgot your password?
                             </Link> */}
-                            {!!error && (
-                                <Alert className="bg-destructive/10 border-none">
-                                    <OctagonAlertIcon className="h-4 w-4 !text-destructive" />
-                                    <AlertTitle>{error}</AlertTitle>
-                                </Alert>
-                            )}
                             <div className="flex flex-col gap-3">
                                 <Button
                                     type="submit"

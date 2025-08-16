@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { problem, user, problemCategory, category } from '@/db/schema';
-import { auth } from '@/lib/auth';
+import { auth } from '@/lib/auth-server';
 import { eq } from 'drizzle-orm';
 
 export async function POST(request: NextRequest) {
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
 
         // Get categories for each problem
         const problemsWithCategories = await Promise.all(
-            problems.map(async (problemData) => {
+            problems.map(async (problemData: any) => {
                 const problemCategories = await db
                     .select({
                         categoryId: problemCategory.categoryId,
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
 
                 return {
                     ...problemData,
-                    categories: problemCategories.map(pc => pc.categoryId)
+                    categories: problemCategories.map((pc: any) => pc.categoryId)
                 };
             })
         );

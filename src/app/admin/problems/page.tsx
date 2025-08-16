@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { toast } from 'sonner';
+import { handleApiResponse, showErrorToast, showSuccessToast } from '@/lib/utils';
 import Link from 'next/link';
 import { Plus, X, Trash2, Tag, Edit2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -95,18 +95,16 @@ export default function AdminProblemsPage() {
     const loadProblems = async () => {
         try {
             const response = await fetch(`/api/problems?page=${currentPage}&perPage=${perPage}`);
-            const data = await response.json();
+            const apiResponse = await handleApiResponse(response, 'Problems loaded successfully', 'Failed to load problems');
 
-            if (data.success) {
-                setProblems(data.problems);
-                setTotalProblems(data.pagination.total);
-                setTotalPages(data.pagination.totalPages);
-            } else {
-                toast.error(data.error || 'Failed to load problems');
+            if (apiResponse.success) {
+                setProblems(apiResponse.data.problems);
+                setTotalProblems(apiResponse.data.pagination.total);
+                setTotalPages(apiResponse.data.pagination.totalPages);
             }
         } catch (error) {
             console.error('Error loading problems:', error);
-            toast.error('Failed to load problems');
+            showErrorToast('Failed to load problems');
         } finally {
             setIsLoading(false);
         }
@@ -120,28 +118,30 @@ export default function AdminProblemsPage() {
     const loadCategories = async () => {
         try {
             const response = await fetch('/api/categories');
-            const data = await response.json();
-            if (data.success) {
-                setCategories(data.categories);
+            const apiResponse = await handleApiResponse(response, 'Categories loaded successfully', 'Failed to load categories');
+
+            if (apiResponse.success) {
+                setCategories(apiResponse.data.categories);
             }
         } catch (error) {
             console.error('Error loading categories:', error);
+            showErrorToast('Failed to load categories');
         }
     };
 
     const handleCreateProblem = async () => {
         if (!newProblem.title.trim()) {
-            toast.error('Problem title is required');
+            showErrorToast('Problem title is required');
             return;
         }
 
         if (!newProblem.description.trim()) {
-            toast.error('Problem description is required');
+            showErrorToast('Problem description is required');
             return;
         }
 
         if (newProblem.categories.length === 0) {
-            toast.error('At least one category is required');
+            showErrorToast('At least one category is required');
             return;
         }
 
@@ -164,20 +164,17 @@ export default function AdminProblemsPage() {
                 }),
             });
 
-            const data = await response.json();
+            const apiResponse = await handleApiResponse(response, 'Problem created successfully!', 'Failed to create problem');
 
-            if (data.success) {
-                toast.success('Problem created successfully!');
+            if (apiResponse.success) {
                 setIsDialogOpen(false);
                 resetForm();
                 setCurrentPage(1); // Reset to first page
                 loadProblems();
-            } else {
-                toast.error(data.error || 'Failed to create problem');
             }
         } catch (error) {
             console.error('Error creating problem:', error);
-            toast.error('Failed to create problem');
+            showErrorToast('Failed to create problem');
         } finally {
             setIsCreating(false);
         }
@@ -185,12 +182,12 @@ export default function AdminProblemsPage() {
 
     const handleCreateCategory = async () => {
         if (!newCategory.name.trim()) {
-            toast.error('Category name is required');
+            showErrorToast('Category name is required');
             return;
         }
 
         if (!newCategory.description.trim()) {
-            toast.error('Category description is required');
+            showErrorToast('Category description is required');
             return;
         }
 
@@ -206,25 +203,17 @@ export default function AdminProblemsPage() {
                 body: JSON.stringify(newCategory),
             });
 
-            const data = await response.json();
-            console.log('Category creation response:', data);
+            const apiResponse = await handleApiResponse(response, 'Category created successfully', 'Failed to create category');
+            console.log('Category creation response:', apiResponse);
 
-            if (data.success) {
-                toast.success('Category created successfully');
+            if (apiResponse.success) {
                 resetCategoryForm();
                 setIsCategoryDialogOpen(false);
                 loadCategories(); // Reload categories
-            } else {
-                console.error('Category creation failed:', data.error);
-                toast.error(data.error || 'Failed to create category');
             }
         } catch (error) {
             console.error('Error creating category:', error);
-            if (error instanceof Error) {
-                toast.error(`Network error: ${error.message}`);
-            } else {
-                toast.error('Failed to create category - Network error');
-            }
+            showErrorToast('Failed to create category - Network error');
         } finally {
             setIsCreatingCategory(false);
         }
@@ -236,18 +225,15 @@ export default function AdminProblemsPage() {
                 method: 'DELETE',
             });
 
-            const data = await response.json();
+            const apiResponse = await handleApiResponse(response, 'Problem deleted successfully', 'Failed to delete problem');
 
-            if (data.success) {
-                toast.success('Problem deleted successfully');
+            if (apiResponse.success) {
                 setCurrentPage(1); // Reset to first page
                 loadProblems(); // Reload the list
-            } else {
-                toast.error(data.error || 'Failed to delete problem');
             }
         } catch (error) {
             console.error('Error deleting problem:', error);
-            toast.error('Failed to delete problem');
+            showErrorToast('Failed to delete problem');
         }
     };
 
@@ -260,12 +246,12 @@ export default function AdminProblemsPage() {
         if (!editingProblem) return;
 
         if (!editingProblem.title.trim()) {
-            toast.error('Problem title is required');
+            showErrorToast('Problem title is required');
             return;
         }
 
         if (!editingProblem.description?.trim()) {
-            toast.error('Problem description is required');
+            showErrorToast('Problem description is required');
             return;
         }
 
@@ -290,20 +276,17 @@ export default function AdminProblemsPage() {
                 body: JSON.stringify(updateData),
             });
 
-            const data = await response.json();
+            const apiResponse = await handleApiResponse(response, 'Problem updated successfully', 'Failed to update problem');
 
-            if (data.success) {
-                toast.success('Problem updated successfully');
+            if (apiResponse.success) {
                 setIsEditDialogOpen(false);
                 setEditingProblem(null);
                 setCurrentPage(1); // Reset to first page
                 loadProblems(); // Reload the list
-            } else {
-                toast.error(data.error || 'Failed to update problem');
             }
         } catch (error) {
             console.error('Error updating problem:', error);
-            toast.error('Failed to update problem');
+            showErrorToast('Failed to update problem');
         }
     };
 

@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { auth } from '@/lib/auth-server';
 import { db } from '@/db';
 import { contest, contestParticipant } from '@/db/schema';
 import { eq, desc } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
     try {
+        // Check if auth is properly configured
+        if (!auth) {
+            console.error('Auth not configured');
+            return NextResponse.json({
+                success: false,
+                error: 'Authentication not configured'
+            }, { status: 503 });
+        }
+
         // Get the current session
         const session = await auth.api.getSession({ headers: request.headers });
 
@@ -13,7 +22,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
-        const currentUserId = session.user.id;
+        const currentUserId = session?.user?.id;
 
         // Fetch contests where the user is a participant
         const userContests = await db

@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { handleApiResponse, showErrorToast, showSuccessToast } from '@/lib/utils';
 
 interface CreateContestModalProps {
     isOpen: boolean;
@@ -55,11 +56,13 @@ export default function CreateContestModal({ isOpen, onClose, onSuccess }: Creat
 
     const validateForm = (): boolean => {
         if (!formData.title.trim()) {
+            showErrorToast('Contest title is required');
             setError('Contest title is required');
             return false;
         }
 
         if (!formData.startDate || !formData.startTime || !formData.endDate || !formData.endTime) {
+            showErrorToast('Start and end dates/times are required');
             setError('Start and end dates/times are required');
             return false;
         }
@@ -69,16 +72,19 @@ export default function CreateContestModal({ isOpen, onClose, onSuccess }: Creat
         const now = new Date();
 
         if (startDateTime <= now) {
+            showErrorToast('Start time must be in the future');
             setError('Start time must be in the future');
             return false;
         }
 
         if (endDateTime <= startDateTime) {
+            showErrorToast('End time must be after start time');
             setError('End time must be after start time');
             return false;
         }
 
         if (formData.maxParticipants < 1 || formData.maxParticipants > 10000) {
+            showErrorToast('Maximum participants must be between 1 and 10,000');
             setError('Maximum participants must be between 1 and 10,000');
             return false;
         }
@@ -109,24 +115,24 @@ export default function CreateContestModal({ isOpen, onClose, onSuccess }: Creat
                 }),
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to create contest');
+            const apiResponse = await handleApiResponse(response, 'Contest created successfully!', 'Failed to create contest');
+
+            if (apiResponse.success) {
+                console.log('Contest created successfully:', apiResponse.data);
+
+                setSuccess(true);
+                setTimeout(() => {
+                    onSuccess();
+                    onClose();
+                    resetForm();
+                }, 1500);
             }
-
-            const result = await response.json();
-            console.log('Contest created successfully:', result);
-
-            setSuccess(true);
-            setTimeout(() => {
-                onSuccess();
-                onClose();
-                resetForm();
-            }, 1500);
 
         } catch (err) {
             console.error('Error creating contest:', err);
-            setError(err instanceof Error ? err.message : 'An error occurred');
+            const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+            setError(errorMessage);
+            showErrorToast(errorMessage);
         } finally {
             setLoading(false);
         }

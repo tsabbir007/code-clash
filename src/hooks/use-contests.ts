@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
+import { handleApiResponse, showErrorToast, showSuccessToast } from '@/lib/utils';
 
 interface Contest {
     id: number;
@@ -58,15 +59,16 @@ export function useContests(options: UseContestsOptions = {}) {
             });
 
             const response = await fetch(`/api/admin/contests?${searchParams}`);
-            if (!response.ok) {
-                throw new Error('Failed to fetch contests');
+            const apiResponse = await handleApiResponse(response, 'Contests loaded successfully', 'Failed to fetch contests');
+
+            if (apiResponse.success) {
+                const data = apiResponse.data as ContestsResponse;
+                setContests(data.contests);
+                setPagination(data.pagination);
+                return data;
             }
 
-            const data: ContestsResponse = await response.json();
-            setContests(data.contests);
-            setPagination(data.pagination);
-
-            return data;
+            throw new Error('Failed to fetch contests');
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'An error occurred';
             setError(errorMessage);
@@ -96,17 +98,18 @@ export function useContests(options: UseContestsOptions = {}) {
                 body: JSON.stringify(contestData),
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to create contest');
+            const apiResponse = await handleApiResponse(response, 'Contest created successfully', 'Failed to create contest');
+
+            if (apiResponse.success) {
+                const newContest = apiResponse.data;
+
+                // Refresh the contests list
+                await fetchContests();
+
+                return newContest;
             }
 
-            const newContest = await response.json();
-
-            // Refresh the contests list
-            await fetchContests();
-
-            return newContest;
+            throw new Error('Failed to create contest');
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'An error occurred';
             setError(errorMessage);
@@ -135,19 +138,20 @@ export function useContests(options: UseContestsOptions = {}) {
                 body: JSON.stringify(updates),
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to update contest');
+            const apiResponse = await handleApiResponse(response, 'Contest updated successfully', 'Failed to update contest');
+
+            if (apiResponse.success) {
+                const updatedContest = apiResponse.data;
+
+                // Update the local state
+                setContests(prev => prev.map(contest =>
+                    contest.id === contestId ? { ...contest, ...updatedContest } : contest
+                ));
+
+                return updatedContest;
             }
 
-            const updatedContest = await response.json();
-
-            // Update the local state
-            setContests(prev => prev.map(contest =>
-                contest.id === contestId ? { ...contest, ...updatedContest } : contest
-            ));
-
-            return updatedContest;
+            throw new Error('Failed to update contest');
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'An error occurred';
             setError(errorMessage);
@@ -166,21 +170,22 @@ export function useContests(options: UseContestsOptions = {}) {
                 method: 'DELETE',
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to delete contest');
+            const apiResponse = await handleApiResponse(response, 'Contest deleted successfully', 'Failed to delete contest');
+
+            if (apiResponse.success) {
+                // Remove from local state
+                setContests(prev => prev.filter(contest => contest.id !== contestId));
+
+                // Update pagination
+                setPagination(prev => ({
+                    ...prev,
+                    total: Math.max(0, prev.total - 1)
+                }));
+
+                return true;
             }
 
-            // Remove from local state
-            setContests(prev => prev.filter(contest => contest.id !== contestId));
-
-            // Update pagination
-            setPagination(prev => ({
-                ...prev,
-                total: Math.max(0, prev.total - 1)
-            }));
-
-            return true;
+            throw new Error('Failed to delete contest');
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'An error occurred';
             setError(errorMessage);
